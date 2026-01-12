@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gh auth:*)",
+      "Bash(powershell:*)",
+      "Bash(git commit:*)",
+      "Bash(cmd /c \"gh repo create BetterPortal --public --source=. --push\")",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo create BetterPortal --public --source=. --push)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo sync --force)",
+      "Bash(git push:*)"
     ]
   }
 }

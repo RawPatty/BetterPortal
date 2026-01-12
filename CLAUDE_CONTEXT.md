@@ -3,57 +3,87 @@
 ## Project Status
 
 **Last Updated**: 2026-01-12
+**Status**: MVP Implementation Complete
 
 ### Completed
-- PRD written (`PRD.md`)
-- 5 spec files created in `specs/`:
-  - `overlay.md` - Keyboard overlay UI, Vim-style nav, search
-  - `bookmarks.md` - Save/organize/navigate resources
-  - `history.md` - Auto-capture browsing history
-  - `diff.md` - Before/after snapshot comparison
-  - `settings.md` - Config, hotkeys, export/import
-- Git repo initialized
-- Initial commit created (commit `9fd51c0`)
+- All 24 implementation tasks from the plan
+- 31 unit tests passing
+- Production build working
 
-### Pending
-- Push to GitHub (gh CLI installed but PATH issue in Claude's shell)
-
-## To Push to GitHub
-
-Run in your terminal:
-```powershell
-cd "F:\Programming\RawPatty\BetterPortal"
-gh repo create BetterPortal --public --source=. --push
+### Project Structure
+```
+src/
+├── background/index.ts           # Service worker
+├── content/
+│   ├── index.ts                  # Content script entry
+│   └── mount.ts                  # Svelte mount
+├── features/
+│   ├── overlay/
+│   │   ├── Overlay.svelte        # Main overlay UI
+│   │   └── overlay.store.ts      # Overlay state
+│   ├── bookmarks/
+│   │   ├── bookmarks.store.ts    # Bookmark CRUD
+│   │   ├── url-parser.ts         # URL parsing utilities
+│   │   └── url-parser.test.ts    # Tests
+│   ├── history/
+│   │   ├── history.store.ts      # History management
+│   │   └── history.observer.ts   # Navigation tracking
+│   ├── diff/
+│   │   ├── token-extractor.ts    # ARM token capture
+│   │   ├── arm-client.ts         # ARM API client
+│   │   ├── snapshot.store.ts     # Snapshot management
+│   │   ├── diff-calculator.ts    # Diff logic
+│   │   ├── diff-calculator.test.ts
+│   │   └── DiffModal.svelte      # Diff UI
+│   └── settings/
+│       ├── settings.store.ts     # Settings management
+│       └── SettingsPanel.svelte  # Settings UI
+├── popup/
+│   ├── index.html
+│   ├── main.ts
+│   └── Popup.svelte              # Extension popup
+├── shared/
+│   ├── types.ts                  # TypeScript interfaces
+│   ├── storage.ts                # Chrome storage wrapper
+│   └── constants.ts              # Shared constants
+└── styles/
+    └── overlay.css               # Global styles
 ```
 
-Or for private repo:
-```powershell
-gh repo create BetterPortal --private --source=. --push
-```
-
-## Tech Stack Decisions
-- **Form Factor**: Chrome browser extension
-- **UI Framework**: Svelte
+## Tech Stack
+- **Form Factor**: Chrome browser extension (Manifest V3)
+- **UI Framework**: Svelte 4
 - **Language**: TypeScript (relaxed strictness)
-- **Storage**: Chrome local storage + IndexedDB
-- **Auth**: Piggyback Azure portal session token
+- **Build**: Vite + CRXJS
+- **Testing**: Vitest + Testing Library
+- **Storage**: Chrome local storage
 
 ## Key Features (MVP)
-1. `Ctrl+Space` overlay with Vim keybindings (j/k/Enter/Esc)
-2. Bookmarks with tenant context + one-click directory switching
+1. `Ctrl+Space` overlay with Vim keybindings
+2. Bookmarks with tenant context + one-click switching
 3. Auto-history capture with promotion to bookmarks
 4. Before/after diff for validating infrastructure changes
 5. Local storage with JSON export
+6. Theming (Portal, Dark, Light)
 
-## Out of Scope (MVP)
+## Commands
+```bash
+npm install       # Install dependencies
+npm run dev       # Development mode
+npm run build     # Production build
+npm test          # Run tests
+```
+
+## Loading in Chrome
+1. Run `npm run build`
+2. Go to `chrome://extensions`
+3. Enable "Developer mode"
+4. Click "Load unpacked" and select `dist/`
+5. Navigate to portal.azure.com
+6. Press `Ctrl+Space`
+
+## Future Enhancements
+- Cloud sync (paid tier)
 - Multi-browser support
-- Cloud sync (future paid feature)
-- Live polling/advanced monitoring
-- Auto-detection of related resources
-
-## Next Steps for Implementation
-1. Scaffold Chrome extension (manifest.json, Svelte setup)
-2. Implement overlay component (Phase 1)
-3. Implement bookmark storage (Phase 1)
-4. Add history auto-capture (Phase 2)
-5. Build diff feature (Phase 3)
+- Live polling dashboard
+- Related resource detection

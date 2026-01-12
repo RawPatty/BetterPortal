@@ -1,0 +1,136 @@
+// Shared TypeScript interfaces for BetterPortal
+
+// ============ Bookmarks ============
+export interface Bookmark {
+  id: string;
+  url: string;
+  tenantId: string;
+  tenantName: string;
+  resourceId: string;
+  displayName: string;
+  alias: string | null;
+  stateDepth: 'full' | 'resource';
+  createdAt: number;
+  lastAccessed: number;
+  accessCount: number;
+  isStale: boolean;
+}
+
+// ============ History ============
+export interface HistoryEntry {
+  id: string;
+  url: string;
+  tenantId: string;
+  tenantName: string;
+  resourceId: string;
+  displayName: string;
+  visitedAt: number;
+  visitCount: number;
+}
+
+// ============ Settings ============
+export interface HotkeyConfig {
+  key: string;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+}
+
+export interface Settings {
+  hotkey: HotkeyConfig;
+  historyEnabled: boolean;
+  historyRetentionDays: number;
+  historyMaxEntries: number;
+  theme: 'portal' | 'dark' | 'light';
+  defaultStateDepth: 'full' | 'resource';
+  showStaleIndicator: boolean;
+  diffIgnoredPaths: string[];
+  maxSnapshotsPerResource: number;
+  lastExportedAt: number | null;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  hotkey: { key: 'Space', ctrl: true, shift: false, alt: false },
+  historyEnabled: true,
+  historyRetentionDays: 30,
+  historyMaxEntries: 500,
+  theme: 'portal',
+  defaultStateDepth: 'full',
+  showStaleIndicator: true,
+  diffIgnoredPaths: ['etag', 'systemData', 'properties.provisioningState'],
+  maxSnapshotsPerResource: 5,
+  lastExportedAt: null,
+};
+
+// ============ Snapshots & Diff ============
+export interface RoleAssignment {
+  principalId: string;
+  principalName: string;
+  roleDefinitionId: string;
+  roleName: string;
+  scope: string;
+}
+
+export interface Snapshot {
+  id: string;
+  resourceId: string;
+  tenantId: string;
+  capturedAt: number;
+  armState: Record<string, unknown>;
+  iamAssignments: RoleAssignment[];
+  label: string;
+}
+
+export interface PropertyDiff {
+  path: string;
+  type: 'added' | 'removed' | 'changed';
+  oldValue?: unknown;
+  newValue?: unknown;
+}
+
+export interface DiffResult {
+  snapshotA: Snapshot;
+  snapshotB: Snapshot;
+  armDiff: PropertyDiff[];
+  iamDiff: {
+    added: RoleAssignment[];
+    removed: RoleAssignment[];
+    unchanged: number;
+  };
+}
+
+// ============ Storage Schema ============
+export interface StorageSchema {
+  bookmarks: Bookmark[];
+  bookmarks_version: number;
+  history: HistoryEntry[];
+  history_version: number;
+  settings: Settings;
+  settings_version: number;
+  snapshots: Snapshot[];
+  snapshots_version: number;
+  cached_token: {
+    token: string;
+    capturedAt: number;
+  } | null;
+}
+
+// ============ URL Parsing ============
+export interface ParsedPortalUrl {
+  tenantId: string | null;
+  tenantDomain: string | null;
+  resourceId: string | null;
+  blade: string | null;
+  fullUrl: string;
+}
+
+// ============ Overlay State ============
+export type OverlayMode = 'navigate' | 'search' | 'settings' | 'diff';
+
+export interface OverlayState {
+  isOpen: boolean;
+  mode: OverlayMode;
+  selectedIndex: number;
+  searchQuery: string;
+  filteredItems: (Bookmark | HistoryEntry)[];
+}

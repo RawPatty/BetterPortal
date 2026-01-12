@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "BetterPortal",
+  "description": "Fast Azure portal navigation with bookmarks, history, and resource diffing",
+  "version": "1.0.0",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://portal.azure.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://portal.azure.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html"
+  }
+}

@@ -1,0 +1,46 @@
+// BetterPortal Content Script
+// Injected into portal.azure.com pages
+
+import { mountOverlay } from './mount';
+import { initHistoryObserver } from '../features/history/history.observer';
+import { initTokenExtractor } from '../features/diff/token-extractor';
+
+let overlayMounted = false;
+
+function init() {
+  // Wait for portal to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onReady);
+  } else {
+    onReady();
+  }
+}
+
+function onReady() {
+  console.log('[BetterPortal] Content script loaded');
+
+  // Mount overlay (initially hidden)
+  if (!overlayMounted) {
+    mountOverlay();
+    overlayMounted = true;
+  }
+
+  // Start history observer
+  initHistoryObserver();
+
+  // Start token extractor for ARM API calls
+  initTokenExtractor();
+
+  // Listen for messages from background
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'TOGGLE_OVERLAY') {
+      window.dispatchEvent(new CustomEvent('betterportal:toggle'));
+      sendResponse({ success: true });
+    }
+    return true;
+  });
+}
+
+init();
+
+export {};

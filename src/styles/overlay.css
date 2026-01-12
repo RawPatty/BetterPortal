@@ -1,0 +1,31 @@
+/* BetterPortal Overlay Styles */
+/* Additional global styles for content script injection */
+
+#betterportal-root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#betterportal-root * {
+  box-sizing: border-box;
+}
+
+/* Reset any portal styles that might leak in */
+#betterportal-root button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+#betterportal-root input {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Ensure overlay is above everything */
+#betterportal-root .bp-overlay {
+  isolation: isolate;
+}

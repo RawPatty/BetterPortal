@@ -21,3 +21,14 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# Lock files (using npm)
+pnpm-lock.yaml
+yarn.lock
