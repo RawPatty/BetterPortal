@@ -1,0 +1,23 @@
+# Temp files
+tmpclaude-*
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# Build
+*.crx
+*.pem
+*.zip
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
