@@ -5,6 +5,8 @@ import {
   parsePortalUrl,
   generateDisplayName,
   getTenantNameFromDOM,
+  getResourceNameFromDOM,
+  isSubscriptionResource,
   stripBlade,
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
@@ -72,13 +74,22 @@ export const bookmarkStore = {
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
     const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
+    // Get display name - prefer DOM name for subscriptions and resource groups
+    let displayName = generateDisplayName(parsed.resourceId || '', parsed.blade);
+    if (parsed.resourceId && isSubscriptionResource(parsed.resourceId)) {
+      const domName = getResourceNameFromDOM();
+      if (domName) {
+        displayName = domName;
+      }
+    }
+
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),
       url: finalUrl,
       tenantId: parsed.tenantId || 'unknown',
       tenantName: getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant',
       resourceId: parsed.resourceId || '',
-      displayName: generateDisplayName(parsed.resourceId || '', parsed.blade),
+      displayName,
       alias: options?.alias || null,
       stateDepth,
       createdAt: Date.now(),

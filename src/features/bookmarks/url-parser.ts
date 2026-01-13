@@ -123,6 +123,40 @@ export function getTenantNameFromDOM(): string | null {
 }
 
 /**
+ * Try to get resource display name from the portal DOM
+ */
+export function getResourceNameFromDOM(): string | null {
+  // Try the blade title first
+  const titleElement = document.querySelector(PORTAL_SELECTORS.RESOURCE_NAME);
+  if (titleElement) {
+    const name = titleElement.textContent?.trim();
+    if (name) return name;
+  }
+
+  // Try the page title (often contains resource name)
+  const pageTitle = document.title;
+  if (pageTitle && !pageTitle.includes('Microsoft Azure')) {
+    // Extract the first part before " - Microsoft Azure"
+    const match = pageTitle.match(/^([^-]+)/);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if a resource ID represents a subscription (not a child resource)
+ */
+export function isSubscriptionResource(resourceId: string): boolean {
+  // Subscription URL pattern: /subscriptions/{guid} without providers
+  const normalized = resourceId.toLowerCase();
+  return /^\/subscriptions\/[a-f0-9-]+\/?$/i.test(normalized) ||
+         (normalized.includes('/subscriptions/') && !normalized.includes('/providers/') && !normalized.includes('/resourcegroups/'));
+}
+
+/**
  * Build a portal URL with tenant ID
  */
 export function buildPortalUrl(
