@@ -11,28 +11,38 @@
     settings,
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
+  import SettingsPanel from '../settings/SettingsPanel.svelte';
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
+  let showSettings = false;
 
   // Track flat index for vim navigation
   $: flatItems = $filteredItems;
   $: currentItem = flatItems[$selectedIndex];
 
   onMount(() => {
+    console.log('[BetterPortal] Overlay component mounted');
+
     // Listen for toggle event from content script
     window.addEventListener('betterportal:toggle', handleToggle);
 
-    // Listen for keyboard shortcuts
-    document.addEventListener('keydown', handleGlobalKeydown);
+    // Listen for keyboard shortcuts (global hotkey)
+    document.addEventListener('keydown', handleGlobalKeydown, true);
+
+    // Listen for overlay keyboard navigation
+    document.addEventListener('keydown', handleOverlayKeydown, true);
 
     // Initialize settings
     overlayActions.refresh();
+
+    console.log('[BetterPortal] Keyboard listener registered');
   });
 
   onDestroy(() => {
     window.removeEventListener('betterportal:toggle', handleToggle);
     document.removeEventListener('keydown', handleGlobalKeydown);
+    document.removeEventListener('keydown', handleOverlayKeydown);
   });
 
   function handleToggle() {
@@ -40,54 +50,82 @@
   }
 
   async function handleGlobalKeydown(event: KeyboardEvent) {
+    // Normalize key for comparison (Space key returns ' ')
+    const pressedKey = event.key === ' ' ? 'Space' : event.key;
+
     // Check if hotkey matches
     const currentSettings = $settings;
-    if (currentSettings) {
-      const { hotkey } = currentSettings;
-      if (
-        event.key === hotkey.key &&
-        event.ctrlKey === hotkey.ctrl &&
-        event.shiftKey === hotkey.shift &&
-        event.altKey === hotkey.alt
-      ) {
-        event.preventDefault();
-        overlayActions.toggle();
-        return;
-      }
-    } else {
-      // Default: Ctrl+Space
-      if (event.key === ' ' && event.ctrlKey && !event.shiftKey && !event.altKey) {
-        event.preventDefault();
-        overlayActions.toggle();
-        return;
-      }
+    const hotkey = currentSettings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false };
+
+    // Debug: log Ctrl key combinations
+    if (event.ctrlKey) {
+      console.log('[BetterPortal] Keydown:', { pressedKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, expected: hotkey });
+    }
+
+    if (
+      pressedKey === hotkey.key &&
+      event.ctrlKey === hotkey.ctrl &&
+      event.shiftKey === hotkey.shift &&
+      event.altKey === hotkey.alt
+    ) {
+      console.log('[BetterPortal] Hotkey matched! Toggling overlay');
+      event.preventDefault();
+      event.stopPropagation();
+      overlayActions.toggle();
+      return;
     }
   }
 
   function handleOverlayKeydown(event: KeyboardEvent) {
     if (!$isOverlayOpen) return;
 
-    // Vim-style navigation
-    switch (event.key) {
-      case 'Escape':
-        event.preventDefault();
-        overlayActions.close();
-        break;
+    // Check if user is typing in search input
+    const isTypingInSearch = document.activeElement === searchInputRef;
 
+    // Escape always works
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (showSettings) {
+        showSettings = false;
+      } else if (isTypingInSearch && $searchQuery) {
+        overlayActions.setSearch('');
+        searchInputRef?.blur();
+      } else {
+        overlayActions.close();
+      }
+      return;
+    }
+
+    // If typing in search, only handle special keys
+    if (isTypingInSearch) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        overlayActions.selectCurrent();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        overlayActions.moveDown();
+        scrollToSelected();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        overlayActions.moveUp();
+        scrollToSelected();
+      }
+      // Let all other keys go through to the input
+      return;
+    }
+
+    // Vim-style navigation (only when not typing)
+    switch (event.key) {
       case 'j':
-        if ($overlayMode === 'navigate') {
-          event.preventDefault();
-          overlayActions.moveDown();
-          scrollToSelected();
-        }
+        event.preventDefault();
+        overlayActions.moveDown();
+        scrollToSelected();
         break;
 
       case 'k':
-        if ($overlayMode === 'navigate') {
-          event.preventDefault();
-          overlayActions.moveUp();
-          scrollToSelected();
-        }
+        event.preventDefault();
+        overlayActions.moveUp();
+        scrollToSelected();
         break;
 
       case 'ArrowDown':
@@ -108,38 +146,31 @@
         break;
 
       case '/':
-        if ($overlayMode === 'navigate') {
-          event.preventDefault();
-          overlayActions.setMode('search');
-          setTimeout(() => searchInputRef?.focus(), 0);
-        }
+        event.preventDefault();
+        setTimeout(() => searchInputRef?.focus(), 0);
         break;
 
       case 'a':
-        if ($overlayMode === 'navigate') {
-          event.preventDefault();
-          overlayActions.saveCurrentPage();
-        }
+        event.preventDefault();
+        overlayActions.saveCurrentPage();
         break;
 
       case 's':
-        if ($overlayMode === 'navigate' && event.ctrlKey) {
-          // Reserved for snapshot
-        }
+        event.preventDefault();
+        // TODO: Capture snapshot
+        console.log('[BetterPortal] Snapshot capture - not yet implemented');
         break;
 
       case 'd':
-        if ($overlayMode === 'navigate' && !event.ctrlKey) {
+        if (!event.ctrlKey) {
           event.preventDefault();
           overlayActions.deleteSelected();
         }
         break;
 
       case '?':
-        if ($overlayMode === 'navigate') {
-          event.preventDefault();
-          overlayActions.setMode('settings');
-        }
+        event.preventDefault();
+        showSettings = true;
         break;
     }
   }
@@ -191,7 +222,6 @@
   <div
     class="bp-overlay {getThemeClass($settings?.theme)}"
     on:click={handleBackdropClick}
-    on:keydown={handleOverlayKeydown}
   >
     <div class="bp-panel" role="dialog" aria-modal="true" aria-label="BetterPortal">
       <header class="bp-header">
@@ -272,15 +302,21 @@
       <footer class="bp-footer">
         <div class="bp-shortcuts">
           <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
-          <span><kbd>Enter</kbd> open</span>
+          <span><kbd>/</kbd> search</span>
           <span><kbd>a</kbd> add</span>
-          <span><kbd>d</kbd> delete</span>
+          <span><kbd>?</kbd> settings</span>
           <span><kbd>Esc</kbd> close</span>
         </div>
       </footer>
     </div>
   </div>
 {/if}
+
+<SettingsPanel
+  isOpen={showSettings}
+  on:close={() => showSettings = false}
+  on:settingsChanged={() => overlayActions.refresh()}
+/>
 
 <style>
   .bp-overlay {
@@ -301,6 +337,7 @@
   .bp-panel {
     width: 600px;
     max-width: 90vw;
+    min-height: 400px;
     max-height: 70vh;
     background: var(--bp-bg, #ffffff);
     border-radius: 8px;
@@ -360,6 +397,7 @@
 
   .bp-list {
     flex: 1;
+    min-height: 200px;
     overflow-y: auto;
     padding: 8px 0;
   }
