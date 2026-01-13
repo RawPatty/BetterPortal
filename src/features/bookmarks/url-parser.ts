@@ -26,7 +26,7 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
     result.tenantDomain = tenantDomainMatch[1];
   }
 
-  // Extract resource ID (try /resource/ format first, then blade format)
+  // Extract resource ID (try multiple formats)
   const resourceIdMatch = url.match(PORTAL_URL_PATTERNS.RESOURCE_ID);
   if (resourceIdMatch) {
     result.resourceId = resourceIdMatch[1];
@@ -38,6 +38,13 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
         result.resourceId = decodeURIComponent(bladeResourceIdMatch[1]);
       } catch {
         result.resourceId = bladeResourceIdMatch[1];
+      }
+    } else {
+      // Try subscription ID as fallback (for subscription-level pages)
+      const subscriptionMatch = url.match(PORTAL_URL_PATTERNS.SUBSCRIPTION_ID);
+      if (subscriptionMatch) {
+        result.resourceId = `/subscriptions/${subscriptionMatch[1]}`;
+        console.log('[BetterPortal] Extracted subscription ID:', result.resourceId);
       }
     }
   }
@@ -65,7 +72,9 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
  * Check if a URL is a resource page
  */
 export function isResourcePage(url: string): boolean {
-  return PORTAL_URL_PATTERNS.IS_RESOURCE_PAGE.test(url);
+  const isResource = PORTAL_URL_PATTERNS.IS_RESOURCE_PAGE.test(url);
+  console.log('[BetterPortal] isResourcePage:', isResource, 'URL:', url.substring(0, 100));
+  return isResource;
 }
 
 /**
@@ -163,7 +172,12 @@ export function getResourceNameFromDOM(): string | null {
     // Extract the first part before " - Microsoft Azure"
     const match = pageTitle.match(/^(.+?)\s*[-–—]\s*Microsoft Azure/i);
     if (match) {
-      const name = match[1].trim();
+      let name = match[1].trim();
+      // Strip blade names like "| Overview", "| Configuration", etc.
+      const bladeMatch = name.match(/^(.+?)\s*\|\s*\w+$/);
+      if (bladeMatch) {
+        name = bladeMatch[1].trim();
+      }
       if (name && !isGuid(name)) {
         console.log('[BetterPortal] Found resource name via page title:', name);
         return name;

@@ -14,11 +14,15 @@ export const PORTAL_URL_PATTERNS = {
   // Match resource ID from blade URL: resourceId%2Fsubscriptions%2F...
   BLADE_RESOURCE_ID: /resourceId[=%2F]+([^&]+)/i,
 
+  // Match subscription ID directly from hash: #@tenant/subscriptions/{guid} or subscriptionId={guid}
+  SUBSCRIPTION_ID: /(?:\/subscriptions\/|subscriptionId[=%])([a-f0-9-]{36})/i,
+
   // Match blade name at end of resource path
   BLADE: /\/resource\/[^/]+\/([^?#/]+)$/,
 
-  // Check if URL is a resource page (either /resource/ or blade with resourceId)
-  IS_RESOURCE_PAGE: /portal\.azure\.com.*(\/resource\/|resourceId[=%2F])/i,
+  // Check if URL is a resource page (multiple patterns for different portal views)
+  // Matches: /resource/, resourceId=, /subscriptions/, blade URLs, view URLs
+  IS_RESOURCE_PAGE: /portal\.azure\.com.*(\/resource\/|resourceId[=%2F]|#.*\/subscriptions\/|#blade\/|#view\/)/i,
 };
 
 // Reserved keyboard shortcuts that should not be overwritten
