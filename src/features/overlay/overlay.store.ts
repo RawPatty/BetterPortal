@@ -131,21 +131,33 @@ export const overlayActions = {
    * Refresh data from storage
    */
   async refresh() {
-    const [bookmarkData, settingsData] = await Promise.all([
-      bookmarkStore.getAll(),
-      settingsStore.get(),
-    ]);
-
-    bookmarks.set(bookmarkData);
-    settings.set(settingsData);
-
-    // Also refresh history if available
     try {
-      const { historyStore } = await import('../history/history.store');
-      const historyData = await historyStore.getRecent(20);
-      history.set(historyData);
-    } catch {
-      // History store may not be loaded yet
+      const [bookmarkData, settingsData] = await Promise.all([
+        bookmarkStore.getAll(),
+        settingsStore.get(),
+      ]);
+
+      bookmarks.set(bookmarkData);
+      settings.set(settingsData);
+
+      // Also refresh history if available
+      try {
+        const { historyStore } = await import('../history/history.store');
+        const historyData = await historyStore.getRecent(20);
+        history.set(historyData);
+      } catch {
+        // History store may not be loaded yet
+      }
+    } catch (e: any) {
+      // Check for extension context invalidated
+      if (e?.message?.includes('Extension') || e?.message?.includes('context')) {
+        console.warn('[BetterPortal] Extension updated - please refresh the page');
+        // Close overlay and alert user
+        isOverlayOpen.set(false);
+        alert('BetterPortal extension was updated. Please refresh the page to continue.');
+      } else {
+        console.error('[BetterPortal] Error refreshing data:', e);
+      }
     }
   },
 

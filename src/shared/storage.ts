@@ -12,15 +12,45 @@ const SCHEMA_VERSIONS = {
 } as const;
 
 /**
+ * Check if extension context is still valid
+ */
+function isContextValid(): boolean {
+  try {
+    return !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Handle invalid context - prompt user to refresh
+ */
+function handleInvalidContext(): never {
+  const msg = '[BetterPortal] Extension updated. Please refresh the page.';
+  console.warn(msg);
+  throw new Error(msg);
+}
+
+/**
  * Get a value from Chrome storage
  */
 export async function storageGet<K extends StorageKey>(
   key: K
 ): Promise<StorageSchema[K] | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(key, (result) => {
-      resolve(result[key] ?? null);
-    });
+  if (!isContextValid()) handleInvalidContext();
+
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage.local.get(key, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(result[key] ?? null);
+        }
+      });
+    } catch (e) {
+      handleInvalidContext();
+    }
   });
 }
 
@@ -31,8 +61,20 @@ export async function storageSet<K extends StorageKey>(
   key: K,
   value: StorageSchema[K]
 ): Promise<void> {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ [key]: value }, resolve);
+  if (!isContextValid()) handleInvalidContext();
+
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage.local.set({ [key]: value }, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve();
+        }
+      });
+    } catch (e) {
+      handleInvalidContext();
+    }
   });
 }
 
