@@ -88,6 +88,16 @@
   function handleOverlayKeydown(event: KeyboardEvent) {
     if (!$isOverlayOpen) return;
 
+    // Don't handle keys when settings panel is open (let it handle its own events)
+    if (showSettings) {
+      // Only handle Escape to close settings
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        showSettings = false;
+      }
+      return;
+    }
+
     // Check if user is typing in search input
     const isTypingInSearch = document.activeElement === searchInputRef;
 
@@ -374,23 +384,24 @@
 
   .bp-search-container {
     position: relative;
+    overflow: hidden;
   }
 
   .bp-search {
     width: 100%;
+    box-sizing: border-box;
     padding: 10px 36px 10px 12px;
     font-size: 14px;
-    border: 1px solid var(--bp-border, #e1e1e1);
+    border: 2px solid var(--bp-border, #e1e1e1);
     border-radius: 4px;
     background: var(--bp-bg-secondary, #f5f5f5);
     color: var(--bp-text, #323130);
     outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s;
   }
 
   .bp-search:focus {
     border-color: var(--bp-accent, #0078d4);
-    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
   }
 
   .bp-search-hint {

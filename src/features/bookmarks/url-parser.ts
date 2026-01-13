@@ -26,10 +26,20 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
     result.tenantDomain = tenantDomainMatch[1];
   }
 
-  // Extract resource ID
+  // Extract resource ID (try /resource/ format first, then blade format)
   const resourceIdMatch = url.match(PORTAL_URL_PATTERNS.RESOURCE_ID);
   if (resourceIdMatch) {
     result.resourceId = resourceIdMatch[1];
+  } else {
+    // Try blade URL format (resourceId is URL-encoded)
+    const bladeResourceIdMatch = url.match(PORTAL_URL_PATTERNS.BLADE_RESOURCE_ID);
+    if (bladeResourceIdMatch) {
+      try {
+        result.resourceId = decodeURIComponent(bladeResourceIdMatch[1]);
+      } catch {
+        result.resourceId = bladeResourceIdMatch[1];
+      }
+    }
   }
 
   // Extract blade name
