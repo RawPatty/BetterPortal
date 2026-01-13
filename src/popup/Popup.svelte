@@ -6,6 +6,7 @@
   let bookmarkCount = 0;
   let historyCount = 0;
   let hotkeyDisplay = 'Ctrl+Space';
+  let version = chrome.runtime.getManifest().version;
 
   onMount(async () => {
     const settings = await settingsStore.get();
@@ -66,7 +67,7 @@
 <div class="popup">
   <header>
     <h1>BetterPortal</h1>
-    <span class="version">v1.0.0</span>
+    <span class="version">v{version}</span>
   </header>
 
   <section class="stats">
@@ -87,10 +88,10 @@
     <button on:click={exportData}>
       Export Data
     </button>
-    <label class="import-btn">
+    <button on:click={() => document.getElementById('import-input')?.click()}>
       Import Data
-      <input type="file" accept=".json" on:change={handleImport} hidden />
-    </label>
+    </button>
+    <input id="import-input" type="file" accept=".json" on:change={handleImport} hidden />
   </section>
 
   <footer>
@@ -159,7 +160,7 @@
     margin-bottom: 16px;
   }
 
-  button, .import-btn {
+  button {
     display: block;
     width: 100%;
     padding: 10px 16px;
@@ -174,7 +175,7 @@
     transition: all 0.15s ease;
   }
 
-  button:hover, .import-btn:hover {
+  button:hover {
     background: #0078d4;
     color: white;
   }

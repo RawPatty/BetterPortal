@@ -27,6 +27,9 @@
     // Listen for toggle event from content script
     window.addEventListener('betterportal:toggle', handleToggle);
 
+    // Listen for open-settings event from content script
+    window.addEventListener('betterportal:open-settings', handleOpenSettings);
+
     // Listen for keyboard shortcuts (global hotkey)
     document.addEventListener('keydown', handleGlobalKeydown, true);
 
@@ -41,9 +44,15 @@
 
   onDestroy(() => {
     window.removeEventListener('betterportal:toggle', handleToggle);
+    window.removeEventListener('betterportal:open-settings', handleOpenSettings);
     document.removeEventListener('keydown', handleGlobalKeydown);
     document.removeEventListener('keydown', handleOverlayKeydown);
   });
+
+  function handleOpenSettings() {
+    overlayActions.open();
+    showSettings = true;
+  }
 
   function handleToggle() {
     overlayActions.toggle();
@@ -170,6 +179,7 @@
 
       case '?':
         event.preventDefault();
+        console.log('[BetterPortal] Opening settings panel');
         showSettings = true;
         break;
     }

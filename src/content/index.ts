@@ -37,10 +37,13 @@ function onReady() {
     // Start token extractor for ARM API calls
     initTokenExtractor();
 
-    // Listen for messages from background
+    // Listen for messages from background/popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === 'TOGGLE_OVERLAY') {
         window.dispatchEvent(new CustomEvent('betterportal:toggle'));
+        sendResponse({ success: true });
+      } else if (message.type === 'OPEN_SETTINGS') {
+        window.dispatchEvent(new CustomEvent('betterportal:open-settings'));
         sendResponse({ success: true });
       }
       return true;
