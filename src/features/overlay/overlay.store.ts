@@ -137,13 +137,16 @@ export const overlayActions = {
         settingsStore.get(),
       ]);
 
+      console.log('[BetterPortal] Loaded', bookmarkData.length, 'bookmarks');
       bookmarks.set(bookmarkData);
       settings.set(settingsData);
 
-      // Also refresh history if available
+      // Also refresh history if available (use settings for limit)
       try {
         const { historyStore } = await import('../history/history.store');
-        const historyData = await historyStore.getRecent(20);
+        const limit = settingsData.historyMaxEntries || 500;
+        const historyData = await historyStore.getRecent(limit);
+        console.log('[BetterPortal] Loaded', historyData.length, 'history items (limit:', limit, ')');
         history.set(historyData);
       } catch {
         // History store may not be loaded yet
