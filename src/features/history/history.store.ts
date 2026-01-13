@@ -48,62 +48,73 @@ export const historyStore = {
    * Add or update history entry
    */
   async upsert(url: string): Promise<HistoryEntry | null> {
-    const settings = await settingsStore.get();
+    try {
+      const settings = await settingsStore.get();
 
-    // Check if history is enabled
-    if (!settings.historyEnabled) {
-      return null;
-    }
+      // Check if history is enabled
+      if (!settings.historyEnabled) {
+        console.log('[BetterPortal] History disabled, skipping capture');
+        return null;
+      }
 
-    const parsed = parsePortalUrl(url);
+      const parsed = parsePortalUrl(url);
+      console.log('[BetterPortal] Parsed URL:', { resourceId: parsed.resourceId, tenantId: parsed.tenantId });
 
-    // Only track resource pages
-    if (!parsed.resourceId) {
-      return null;
-    }
+      // Only track resource pages
+      if (!parsed.resourceId) {
+        console.log('[BetterPortal] No resourceId found, skipping');
+        return null;
+      }
 
-    const all = await this.getAll();
+      const all = await this.getAll();
+      console.log('[BetterPortal] Current history count:', all.length);
 
-    // Check if entry already exists
-    const existingIndex = all.findIndex(
-      (h) => h.resourceId === parsed.resourceId && h.tenantId === parsed.tenantId
-    );
+      // Check if entry already exists
+      const existingIndex = all.findIndex(
+        (h) => h.resourceId === parsed.resourceId && h.tenantId === parsed.tenantId
+      );
 
-    if (existingIndex >= 0) {
-      // Update existing entry
-      all[existingIndex] = {
-        ...all[existingIndex],
+      if (existingIndex >= 0) {
+        // Update existing entry
+        all[existingIndex] = {
+          ...all[existingIndex],
+          url,
+          visitedAt: Date.now(),
+          visitCount: all[existingIndex].visitCount + 1,
+        };
+        await storageSet('history', all);
+        console.log('[BetterPortal] Updated existing history entry');
+        return all[existingIndex];
+      }
+
+      // Get display name - prefer DOM name, fall back to parsed name
+      const domName = getResourceNameFromDOM();
+      const displayName = domName || generateDisplayName(parsed.resourceId, parsed.blade);
+
+      // Create new entry
+      const entry: HistoryEntry = {
+        id: crypto.randomUUID(),
         url,
+        tenantId: parsed.tenantId || 'unknown',
+        tenantName: getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant',
+        resourceId: parsed.resourceId,
+        displayName,
         visitedAt: Date.now(),
-        visitCount: all[existingIndex].visitCount + 1,
+        visitCount: 1,
       };
-      await storageSet('history', all);
-      return all[existingIndex];
+
+      all.push(entry);
+
+      // Prune if over limit - use the pruned result
+      const pruned = await this.prune(all, settings);
+
+      await storageSet('history', pruned);
+      console.log('[BetterPortal] Added new history entry:', displayName, '(total:', pruned.length, ')');
+      return entry;
+    } catch (error) {
+      console.error('[BetterPortal] Error in history upsert:', error);
+      return null;
     }
-
-    // Get display name - prefer DOM name, fall back to parsed name
-    const domName = getResourceNameFromDOM();
-    const displayName = domName || generateDisplayName(parsed.resourceId, parsed.blade);
-
-    // Create new entry
-    const entry: HistoryEntry = {
-      id: crypto.randomUUID(),
-      url,
-      tenantId: parsed.tenantId || 'unknown',
-      tenantName: getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant',
-      resourceId: parsed.resourceId,
-      displayName,
-      visitedAt: Date.now(),
-      visitCount: 1,
-    };
-
-    all.push(entry);
-
-    // Prune if over limit
-    await this.prune(all, settings);
-
-    await storageSet('history', all);
-    return entry;
   },
 
   /**
