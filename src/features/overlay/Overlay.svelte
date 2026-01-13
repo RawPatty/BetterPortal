@@ -30,6 +30,9 @@
     // Listen for open-settings event from content script
     window.addEventListener('betterportal:open-settings', handleOpenSettings);
 
+    // Listen for navigation events to refresh list
+    window.addEventListener('betterportal:navigation', handleNavigation);
+
     // Listen for keyboard shortcuts (global hotkey)
     document.addEventListener('keydown', handleGlobalKeydown, true);
 
@@ -45,6 +48,7 @@
   onDestroy(() => {
     window.removeEventListener('betterportal:toggle', handleToggle);
     window.removeEventListener('betterportal:open-settings', handleOpenSettings);
+    window.removeEventListener('betterportal:navigation', handleNavigation);
     document.removeEventListener('keydown', handleGlobalKeydown);
     document.removeEventListener('keydown', handleOverlayKeydown);
   });
@@ -52,6 +56,13 @@
   function handleOpenSettings() {
     overlayActions.open();
     showSettings = true;
+  }
+
+  function handleNavigation() {
+    // Refresh the list if overlay is open
+    if ($isOverlayOpen) {
+      overlayActions.refresh();
+    }
   }
 
   function handleToggle() {

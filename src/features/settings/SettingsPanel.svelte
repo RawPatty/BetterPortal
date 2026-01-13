@@ -195,11 +195,17 @@
 
         <!-- History Section -->
         <section class="bp-settings-section">
-          <h3>History</h3>
+          <h3>History & Bookmarks</h3>
           <div class="bp-settings-row">
             <label>
               <input type="checkbox" bind:checked={settings.historyEnabled} on:change={handleHistoryToggle} />
               Enable history tracking
+            </label>
+          </div>
+          <div class="bp-settings-row">
+            <label>
+              <input type="checkbox" bind:checked={settings.autoBookmark} on:change={saveSettings} />
+              Auto-bookmark visited pages
             </label>
           </div>
           <div class="bp-settings-row">

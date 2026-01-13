@@ -1,5 +1,7 @@
 // History Observer for Azure Portal navigation
 import { historyStore } from './history.store';
+import { bookmarkStore } from '../bookmarks/bookmarks.store';
+import { settingsStore } from '../settings/settings.store';
 import { isResourcePage } from '../bookmarks/url-parser';
 import { HISTORY_DEBOUNCE_MS } from '../../shared/constants';
 
@@ -77,7 +79,7 @@ function handleNavigation(source: string): void {
 }
 
 /**
- * Capture current page in history
+ * Capture current page in history and optionally as bookmark
  */
 async function captureCurrentPage(): Promise<void> {
   const url = window.location.href;
@@ -89,12 +91,24 @@ async function captureCurrentPage(): Promise<void> {
   }
 
   try {
+    const settings = await settingsStore.get();
+
+    // Capture in history
     const entry = await historyStore.upsert(url);
     if (entry) {
       console.log('[BetterPortal] History captured:', entry.displayName);
     }
+
+    // Auto-bookmark if enabled
+    if (settings.autoBookmark) {
+      const bookmark = await bookmarkStore.saveCurrentPage();
+      console.log('[BetterPortal] Auto-bookmarked:', bookmark.displayName);
+    }
+
+    // Dispatch event for overlay to refresh if open
+    window.dispatchEvent(new CustomEvent('betterportal:navigation'));
   } catch (error) {
-    console.error('[BetterPortal] Failed to capture history:', error);
+    console.error('[BetterPortal] Failed to capture page:', error);
   }
 }
 

@@ -41,6 +41,7 @@ export interface Settings {
   historyEnabled: boolean;
   historyRetentionDays: number;
   historyMaxEntries: number;
+  autoBookmark: boolean;
   theme: 'portal' | 'dark' | 'light';
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
@@ -54,6 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 500,
+  autoBookmark: true,
   theme: 'portal',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
