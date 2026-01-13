@@ -15,11 +15,23 @@ export const historyStore = {
   },
 
   /**
-   * Get recent history entries
+   * Get recent history entries (deduplicated, most recent first)
    */
   async getRecent(limit: number = 20): Promise<HistoryEntry[]> {
     const all = await this.getAll();
-    return all
+
+    // Deduplicate by resourceId+tenantId, keeping the most recent
+    const seen = new Map<string, HistoryEntry>();
+    for (const entry of all) {
+      const key = `${entry.resourceId}:${entry.tenantId}`;
+      const existing = seen.get(key);
+      if (!existing || entry.visitedAt > existing.visitedAt) {
+        seen.set(key, entry);
+      }
+    }
+
+    // Sort by visitedAt descending (most recent first)
+    return Array.from(seen.values())
       .sort((a, b) => b.visitedAt - a.visitedAt)
       .slice(0, limit);
   },

@@ -193,13 +193,21 @@ export const overlayActions = {
     const index = get(selectedIndex);
     const item = items[index];
 
-    if (!item) return;
+    if (!item) {
+      console.log('[BetterPortal] No item selected to delete');
+      return;
+    }
+
+    console.log('[BetterPortal] Deleting item:', item.type, item.displayName);
 
     if (item.type === 'bookmark') {
       await bookmarkStore.delete(item.id);
-      await this.refresh();
+    } else if (item.type === 'history') {
+      const { historyStore } = await import('../history/history.store');
+      await historyStore.delete(item.id);
     }
-    // History items can't be individually deleted in this implementation
+
+    await this.refresh();
   },
 
   /**
