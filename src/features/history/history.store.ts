@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM, isSubscriptionResource } from '../bookmarks/url-parser';
+import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -81,14 +81,9 @@ export const historyStore = {
       return all[existingIndex];
     }
 
-    // Get display name - prefer DOM name for subscriptions
-    let displayName = generateDisplayName(parsed.resourceId, parsed.blade);
-    if (parsed.resourceId && isSubscriptionResource(parsed.resourceId)) {
-      const domName = getResourceNameFromDOM();
-      if (domName) {
-        displayName = domName;
-      }
-    }
+    // Get display name - prefer DOM name, fall back to parsed name
+    const domName = getResourceNameFromDOM();
+    const displayName = domName || generateDisplayName(parsed.resourceId, parsed.blade);
 
     // Create new entry
     const entry: HistoryEntry = {

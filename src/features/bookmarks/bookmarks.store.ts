@@ -74,14 +74,10 @@ export const bookmarkStore = {
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
     const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
-    // Get display name - prefer DOM name for subscriptions and resource groups
-    let displayName = generateDisplayName(parsed.resourceId || '', parsed.blade);
-    if (parsed.resourceId && isSubscriptionResource(parsed.resourceId)) {
-      const domName = getResourceNameFromDOM();
-      if (domName) {
-        displayName = domName;
-      }
-    }
+    // Get display name - prefer DOM name, fall back to parsed name
+    const domName = getResourceNameFromDOM();
+    let displayName = domName || generateDisplayName(parsed.resourceId || '', parsed.blade);
+    console.log('[BetterPortal] Display name:', displayName, '(DOM:', domName, ', parsed:', generateDisplayName(parsed.resourceId || '', parsed.blade), ')');
 
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),

@@ -126,24 +126,60 @@ export function getTenantNameFromDOM(): string | null {
  * Try to get resource display name from the portal DOM
  */
 export function getResourceNameFromDOM(): string | null {
-  // Try the blade title first
-  const titleElement = document.querySelector(PORTAL_SELECTORS.RESOURCE_NAME);
-  if (titleElement) {
-    const name = titleElement.textContent?.trim();
-    if (name) return name;
+  // Try various selectors for resource/subscription names
+  const selectors = [
+    PORTAL_SELECTORS.RESOURCE_NAME,
+    // Subscription name in overview blade
+    '.fxs-blade-title-titleText',
+    '.fxs-journey-breadcrumb-title',
+    // Subscription display name in header
+    '[data-bind*="text: displayName"]',
+    'h2.msportalfx-text-header',
+    '.ext-azure-subscription-name',
+    // Generic header elements
+    '.fxs-blade-header-title',
+    '.azc-formElementSubLabelContainer',
+  ];
+
+  for (const selector of selectors) {
+    try {
+      const element = document.querySelector(selector);
+      if (element) {
+        const name = element.textContent?.trim();
+        // Skip if it's just a GUID or empty
+        if (name && !isGuid(name) && name.length > 0) {
+          console.log('[BetterPortal] Found resource name via selector:', selector, '->', name);
+          return name;
+        }
+      }
+    } catch {
+      // Selector might be invalid
+    }
   }
 
   // Try the page title (often contains resource name)
   const pageTitle = document.title;
-  if (pageTitle && !pageTitle.includes('Microsoft Azure')) {
+  if (pageTitle) {
     // Extract the first part before " - Microsoft Azure"
-    const match = pageTitle.match(/^([^-]+)/);
+    const match = pageTitle.match(/^(.+?)\s*[-–—]\s*Microsoft Azure/i);
     if (match) {
-      return match[1].trim();
+      const name = match[1].trim();
+      if (name && !isGuid(name)) {
+        console.log('[BetterPortal] Found resource name via page title:', name);
+        return name;
+      }
     }
   }
 
+  console.log('[BetterPortal] Could not find resource name in DOM');
   return null;
+}
+
+/**
+ * Check if a string looks like a GUID
+ */
+function isGuid(str: string): boolean {
+  return /^[a-f0-9-]{36}$/i.test(str.trim());
 }
 
 /**
