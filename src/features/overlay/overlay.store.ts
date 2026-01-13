@@ -34,12 +34,27 @@ export const filteredItems = derived(
   ([$bookmarks, $history, $searchQuery, $mode]) => {
     let items: DisplayItem[] = [];
 
-    // Add bookmarks
-    items.push(...$bookmarks.map((b) => ({ ...b, type: 'bookmark' as const })));
+    // Track seen resources to deduplicate (resourceId:tenantId)
+    const seen = new Set<string>();
 
-    // Add history if in navigate mode
+    // Add bookmarks first (they take priority over history)
+    for (const b of $bookmarks) {
+      const key = `${b.resourceId}:${b.tenantId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        items.push({ ...b, type: 'bookmark' as const });
+      }
+    }
+
+    // Add history if in navigate mode (skip if already bookmarked)
     if ($mode === 'navigate') {
-      items.push(...$history.map((h) => ({ ...h, type: 'history' as const })));
+      for (const h of $history) {
+        const key = `${h.resourceId}:${h.tenantId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          items.push({ ...h, type: 'history' as const });
+        }
+      }
     }
 
     // Filter by search query
