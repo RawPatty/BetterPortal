@@ -132,6 +132,18 @@ export function getTenantNameFromDOM(): string | null {
 }
 
 /**
+ * Strip blade suffix from resource name (e.g., "my-resource | Overview" -> "my-resource")
+ */
+function stripBladeSuffix(name: string): string {
+  // Strip blade names like "| Overview", "| Configuration", etc.
+  const bladeMatch = name.match(/^(.+?)\s*\|\s*\w+$/);
+  if (bladeMatch) {
+    return bladeMatch[1].trim();
+  }
+  return name;
+}
+
+/**
  * Try to get resource display name from the portal DOM
  */
 export function getResourceNameFromDOM(): string | null {
@@ -154,11 +166,15 @@ export function getResourceNameFromDOM(): string | null {
     try {
       const element = document.querySelector(selector);
       if (element) {
-        const name = element.textContent?.trim();
+        let name = element.textContent?.trim();
         // Skip if it's just a GUID or empty
-        if (name && !isGuid(name) && name.length > 0) {
-          console.log('[BetterPortal] Found resource name via selector:', selector, '->', name);
-          return name;
+        if (name && name.length > 0) {
+          // Strip blade suffix like "| Overview"
+          name = stripBladeSuffix(name);
+          if (!isGuid(name)) {
+            console.log('[BetterPortal] Found resource name via selector:', selector, '->', name);
+            return name;
+          }
         }
       }
     } catch {
@@ -172,12 +188,7 @@ export function getResourceNameFromDOM(): string | null {
     // Extract the first part before " - Microsoft Azure"
     const match = pageTitle.match(/^(.+?)\s*[-–—]\s*Microsoft Azure/i);
     if (match) {
-      let name = match[1].trim();
-      // Strip blade names like "| Overview", "| Configuration", etc.
-      const bladeMatch = name.match(/^(.+?)\s*\|\s*\w+$/);
-      if (bladeMatch) {
-        name = bladeMatch[1].trim();
-      }
+      let name = stripBladeSuffix(match[1].trim());
       if (name && !isGuid(name)) {
         console.log('[BetterPortal] Found resource name via page title:', name);
         return name;
