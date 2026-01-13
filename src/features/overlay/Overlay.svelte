@@ -304,6 +304,7 @@
           <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
           <span><kbd>/</kbd> search</span>
           <span><kbd>a</kbd> add</span>
+          <span><kbd>d</kbd> delete</span>
           <span><kbd>?</kbd> settings</span>
           <span><kbd>Esc</kbd> close</span>
         </div>

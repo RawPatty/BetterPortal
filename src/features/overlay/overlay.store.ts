@@ -220,6 +220,14 @@ export const overlayActions = {
     }
 
     await this.refresh();
+
+    // Adjust selectedIndex if we deleted the last item
+    const newItems = get(filteredItems);
+    if (index >= newItems.length && newItems.length > 0) {
+      selectedIndex.set(newItems.length - 1);
+    } else if (newItems.length === 0) {
+      selectedIndex.set(0);
+    }
   },
 
   /**
