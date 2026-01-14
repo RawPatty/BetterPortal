@@ -79,13 +79,52 @@ export function isResourcePage(url: string): boolean {
 
 /**
  * Extract resource name from resource ID
- * e.g., /subscriptions/.../sites/myapp -> myapp
+ * e.g., /subscriptions/.../Microsoft.Storage/storageAccounts/mystorageaccount -> mystorageaccount
  */
 export function extractResourceName(resourceId: string): string {
   const parts = resourceId.split('/');
-  // Resource name is typically the last meaningful segment
-  // Skip common blade names
-  const bladeNames = ['overview', 'configuration', 'settings', 'users', 'keys', 'networking'];
+
+  // Find the providers segment and extract the resource name after the resource type
+  // Pattern: .../providers/Microsoft.X/resourceType/resourceName/...
+  const providersIndex = parts.findIndex(p => p.toLowerCase() === 'providers');
+  if (providersIndex >= 0 && providersIndex + 3 < parts.length) {
+    // providers/Microsoft.X/resourceType/resourceName
+    const resourceName = parts[providersIndex + 3];
+    if (resourceName && resourceName.length > 0) {
+      return resourceName;
+    }
+  }
+
+  // For resource groups: /subscriptions/{guid}/resourceGroups/{name}
+  const rgIndex = parts.findIndex(p => p.toLowerCase() === 'resourcegroups');
+  if (rgIndex >= 0 && rgIndex + 1 < parts.length) {
+    // Check if there's no provider after it (meaning we're viewing the RG itself)
+    if (providersIndex < 0 || providersIndex < rgIndex) {
+      const rgName = parts[rgIndex + 1];
+      if (rgName && rgName.length > 0) {
+        return rgName;
+      }
+    }
+  }
+
+  // For subscriptions: /subscriptions/{guid}
+  const subIndex = parts.findIndex(p => p.toLowerCase() === 'subscriptions');
+  if (subIndex >= 0 && subIndex + 1 < parts.length) {
+    const subId = parts[subIndex + 1];
+    if (subId && subId.length > 0) {
+      return subId;
+    }
+  }
+
+  // Fallback: skip common blade names and return last meaningful segment
+  const bladeNames = [
+    'overview', 'configuration', 'settings', 'users', 'keys', 'networking',
+    'containerslist', 'containers', 'blobs', 'files', 'queues', 'tables',
+    'accesskeys', 'properties', 'diagnostics', 'metrics', 'logs', 'insights',
+    'security', 'identity', 'encryption', 'firewall', 'networking', 'tags',
+    'locks', 'export', 'automation', 'support', 'health', 'advisor',
+    'default', 'blobservices', 'fileservices', 'queueservices', 'tableservices'
+  ];
 
   for (let i = parts.length - 1; i >= 0; i--) {
     const part = parts[i];
