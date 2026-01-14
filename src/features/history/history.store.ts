@@ -90,23 +90,26 @@ export const historyStore = {
         return all[existingIndex];
       }
 
+      // Get resource name from URL - this is always accurate
+      const urlResourceName = extractResourceName(parsed.resourceId);
+
       // Wait for DOM to update before extracting name
       await new Promise(resolve => setTimeout(resolve, DOM_EXTRACTION_DELAY_MS));
 
-      // Get expected resource name from URL
-      const urlResourceName = extractResourceName(parsed.resourceId);
-
-      // Try to get DOM name
+      // Try to get DOM name for additional context
       const domName = getResourceNameFromDOM();
 
-      // Use DOM name if available and valid, otherwise use URL-extracted name
+      // Use URL-extracted name as primary (always correct)
+      // Only use DOM name if it looks like it matches the current resource
       let displayName: string;
-      if (domName) {
+      if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
+        // DOM name contains the resource name, use it (might have friendly formatting)
         displayName = domName;
-        console.log('[BetterPortal] Using DOM name:', domName);
+        console.log('[BetterPortal] Using DOM name (matches URL):', domName);
       } else {
+        // DOM name doesn't match - use URL-extracted name
         displayName = urlResourceName;
-        console.log('[BetterPortal] Using URL resource name:', urlResourceName);
+        console.log('[BetterPortal] Using URL resource name:', urlResourceName, '(DOM was:', domName, ')');
       }
 
       // Create new entry

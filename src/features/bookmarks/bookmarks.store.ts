@@ -6,6 +6,7 @@ import {
   generateDisplayName,
   getTenantNameFromDOM,
   getResourceNameFromDOM,
+  extractResourceName,
   isSubscriptionResource,
   stripBlade,
 } from './url-parser';
@@ -74,10 +75,22 @@ export const bookmarkStore = {
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
     const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
-    // Get display name - prefer DOM name, fall back to parsed name
+    // Get resource name from URL - this is always accurate
+    const urlResourceName = parsed.resourceId ? extractResourceName(parsed.resourceId) : 'Unknown';
+
+    // Get DOM name for potential friendly formatting
     const domName = getResourceNameFromDOM();
-    let displayName = domName || generateDisplayName(parsed.resourceId || '', parsed.blade);
-    console.log('[BetterPortal] Display name:', displayName, '(DOM:', domName, ', parsed:', generateDisplayName(parsed.resourceId || '', parsed.blade), ')');
+
+    // Use URL-extracted name as primary (always correct)
+    // Only use DOM name if it contains the URL resource name
+    let displayName: string;
+    if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
+      displayName = domName;
+      console.log('[BetterPortal] Bookmark using DOM name (matches URL):', domName);
+    } else {
+      displayName = urlResourceName;
+      console.log('[BetterPortal] Bookmark using URL resource name:', urlResourceName, '(DOM was:', domName, ')');
+    }
 
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),
