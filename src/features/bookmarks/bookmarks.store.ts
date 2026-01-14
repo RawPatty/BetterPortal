@@ -7,6 +7,7 @@ import {
   getTenantNameFromDOM,
   getResourceNameFromDOM,
   extractResourceName,
+  extractDisplayName,
   isSubscriptionResource,
   stripBlade,
 } from './url-parser';
@@ -75,21 +76,28 @@ export const bookmarkStore = {
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
     const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
-    // Get resource name from URL - this is always accurate
+    // Get display name from URL (resource name + blade)
+    const urlDisplayName = parsed.resourceId ? extractDisplayName(parsed.resourceId) : 'Unknown';
     const urlResourceName = parsed.resourceId ? extractResourceName(parsed.resourceId) : 'Unknown';
 
     // Get DOM name for potential friendly formatting
     const domName = getResourceNameFromDOM();
 
-    // Use URL-extracted name as primary (always correct)
-    // Only use DOM name if it contains the URL resource name
+    // Use URL-extracted display name as primary (always correct, includes blade)
+    // Only use DOM name if it matches the current resource
     let displayName: string;
     if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
-      displayName = domName;
-      console.log('[BetterPortal] Bookmark using DOM name (matches URL):', domName);
+      // DOM name contains the resource name - use it but we still want blade info
+      const bladePart = urlDisplayName.includes(' > ') ? urlDisplayName.split(' > ')[1] : null;
+      if (bladePart) {
+        displayName = `${domName} > ${bladePart}`;
+      } else {
+        displayName = domName;
+      }
+      console.log('[BetterPortal] Bookmark using DOM name with blade:', displayName);
     } else {
-      displayName = urlResourceName;
-      console.log('[BetterPortal] Bookmark using URL resource name:', urlResourceName, '(DOM was:', domName, ')');
+      displayName = urlDisplayName;
+      console.log('[BetterPortal] Bookmark using URL display name:', urlDisplayName, '(DOM was:', domName, ')');
     }
 
     const bookmark: Bookmark = {

@@ -77,12 +77,24 @@ export function isResourcePage(url: string): boolean {
   return isResource;
 }
 
+// Common blade/view names in Azure portal
+const BLADE_NAMES = new Set([
+  'overview', 'configuration', 'settings', 'users', 'keys', 'networking',
+  'containerslist', 'containers', 'blobs', 'files', 'queues', 'tables',
+  'accesskeys', 'properties', 'diagnostics', 'metrics', 'logs', 'insights',
+  'security', 'identity', 'encryption', 'firewall', 'tags', 'events',
+  'locks', 'export', 'automation', 'support', 'health', 'advisor',
+  'default', 'blobservices', 'fileservices', 'queueservices', 'tableservices',
+  'accesscontrol', 'deployments', 'policies', 'alerts', 'activitylog',
+  'costanalysis', 'budgets', 'recommendations', 'resourcehealth'
+]);
+
 /**
  * Extract resource name from resource ID
  * e.g., /subscriptions/.../Microsoft.Storage/storageAccounts/mystorageaccount -> mystorageaccount
  */
 export function extractResourceName(resourceId: string): string {
-  const parts = resourceId.split('/');
+  const parts = resourceId.split('/').filter(p => p.length > 0);
 
   // Find the providers segment and extract the resource name after the resource type
   // Pattern: .../providers/Microsoft.X/resourceType/resourceName/...
@@ -116,24 +128,50 @@ export function extractResourceName(resourceId: string): string {
     }
   }
 
-  // Fallback: skip common blade names and return last meaningful segment
-  const bladeNames = [
-    'overview', 'configuration', 'settings', 'users', 'keys', 'networking',
-    'containerslist', 'containers', 'blobs', 'files', 'queues', 'tables',
-    'accesskeys', 'properties', 'diagnostics', 'metrics', 'logs', 'insights',
-    'security', 'identity', 'encryption', 'firewall', 'networking', 'tags',
-    'locks', 'export', 'automation', 'support', 'health', 'advisor',
-    'default', 'blobservices', 'fileservices', 'queueservices', 'tableservices'
-  ];
-
+  // Fallback: skip blade names and return last meaningful segment
   for (let i = parts.length - 1; i >= 0; i--) {
     const part = parts[i];
-    if (part && !bladeNames.includes(part.toLowerCase())) {
+    if (part && !BLADE_NAMES.has(part.toLowerCase())) {
       return part;
     }
   }
 
   return parts[parts.length - 1] || 'Unknown';
+}
+
+/**
+ * Extract blade/view name from resource ID if present
+ * e.g., /subscriptions/.../storageAccounts/mystorageaccount/containersList -> containersList
+ */
+export function extractBladeName(resourceId: string): string | null {
+  const parts = resourceId.split('/').filter(p => p.length > 0);
+
+  // Check if the last segment is a known blade name
+  if (parts.length > 0) {
+    const lastPart = parts[parts.length - 1];
+    if (BLADE_NAMES.has(lastPart.toLowerCase())) {
+      return lastPart;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract full display name with resource and blade
+ * e.g., "mystorageaccount > Containers"
+ */
+export function extractDisplayName(resourceId: string): string {
+  const resourceName = extractResourceName(resourceId);
+  const bladeName = extractBladeName(resourceId);
+
+  if (bladeName && bladeName.toLowerCase() !== 'overview') {
+    // Format blade name nicely (capitalize first letter)
+    const formattedBlade = bladeName.charAt(0).toUpperCase() + bladeName.slice(1);
+    return `${resourceName} > ${formattedBlade}`;
+  }
+
+  return resourceName;
 }
 
 /**

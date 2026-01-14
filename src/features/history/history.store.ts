@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName } from '../bookmarks/url-parser';
+import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -90,7 +90,8 @@ export const historyStore = {
         return all[existingIndex];
       }
 
-      // Get resource name from URL - this is always accurate
+      // Get display name from URL (resource name + blade)
+      const urlDisplayName = extractDisplayName(parsed.resourceId);
       const urlResourceName = extractResourceName(parsed.resourceId);
 
       // Wait for DOM to update before extracting name
@@ -99,17 +100,23 @@ export const historyStore = {
       // Try to get DOM name for additional context
       const domName = getResourceNameFromDOM();
 
-      // Use URL-extracted name as primary (always correct)
-      // Only use DOM name if it looks like it matches the current resource
+      // Use URL-extracted display name as primary (always correct, includes blade)
+      // Only use DOM name if it matches the current resource
       let displayName: string;
       if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
-        // DOM name contains the resource name, use it (might have friendly formatting)
-        displayName = domName;
-        console.log('[BetterPortal] Using DOM name (matches URL):', domName);
+        // DOM name contains the resource name - use it but we still want blade info
+        // If URL has blade info, append it
+        const bladePart = urlDisplayName.includes(' > ') ? urlDisplayName.split(' > ')[1] : null;
+        if (bladePart) {
+          displayName = `${domName} > ${bladePart}`;
+        } else {
+          displayName = domName;
+        }
+        console.log('[BetterPortal] Using DOM name with blade:', displayName);
       } else {
-        // DOM name doesn't match - use URL-extracted name
-        displayName = urlResourceName;
-        console.log('[BetterPortal] Using URL resource name:', urlResourceName, '(DOM was:', domName, ')');
+        // DOM name doesn't match - use URL-extracted display name
+        displayName = urlDisplayName;
+        console.log('[BetterPortal] Using URL display name:', urlDisplayName, '(DOM was:', domName, ')');
       }
 
       // Create new entry
