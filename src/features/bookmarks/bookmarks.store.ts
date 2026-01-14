@@ -76,25 +76,26 @@ export const bookmarkStore = {
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
     const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
-    // Get display name from URL (resource name + blade)
+    // Get display name from URL (resource name + sub-path)
     const urlDisplayName = parsed.resourceId ? extractDisplayName(parsed.resourceId) : 'Unknown';
     const urlResourceName = parsed.resourceId ? extractResourceName(parsed.resourceId) : 'Unknown';
 
     // Get DOM name for potential friendly formatting
     const domName = getResourceNameFromDOM();
 
-    // Use URL-extracted display name as primary (always correct, includes blade)
+    // Use URL-extracted display name as primary (always correct, includes hierarchy)
     // Only use DOM name if it matches the current resource
     let displayName: string;
     if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
-      // DOM name contains the resource name - use it but we still want blade info
-      const bladePart = urlDisplayName.includes(' > ') ? urlDisplayName.split(' > ')[1] : null;
-      if (bladePart) {
-        displayName = `${domName} > ${bladePart}`;
+      // DOM name contains the resource name - use it but keep the sub-path from URL
+      const urlParts = urlDisplayName.split(' | ');
+      if (urlParts.length > 1) {
+        // Replace the resource name part with DOM name, keep the rest
+        displayName = [domName, ...urlParts.slice(1)].join(' | ');
       } else {
         displayName = domName;
       }
-      console.log('[BetterPortal] Bookmark using DOM name with blade:', displayName);
+      console.log('[BetterPortal] Bookmark using DOM name with path:', displayName);
     } else {
       displayName = urlDisplayName;
       console.log('[BetterPortal] Bookmark using URL display name:', urlDisplayName, '(DOM was:', domName, ')');

@@ -139,36 +139,64 @@ export function extractResourceName(resourceId: string): string {
   return parts[parts.length - 1] || 'Unknown';
 }
 
-/**
- * Extract blade/view name from resource ID if present
- * e.g., /subscriptions/.../storageAccounts/mystorageaccount/containersList -> containersList
- */
-export function extractBladeName(resourceId: string): string | null {
-  const parts = resourceId.split('/').filter(p => p.length > 0);
+// Service type names to skip in path (keep the actual resource names)
+const SERVICE_TYPES = new Set([
+  'blobservices', 'fileservices', 'queueservices', 'tableservices',
+  'default', 'providers'
+]);
 
-  // Check if the last segment is a known blade name
-  if (parts.length > 0) {
-    const lastPart = parts[parts.length - 1];
-    if (BLADE_NAMES.has(lastPart.toLowerCase())) {
-      return lastPart;
+/**
+ * Extract the full resource path after the main resource
+ * e.g., /storageAccounts/mystorageaccount/blobServices/default/containers/$web
+ * Returns: ['containers', '$web']
+ */
+function extractSubResourcePath(resourceId: string): string[] {
+  const parts = resourceId.split('/').filter(p => p.length > 0);
+  const result: string[] = [];
+
+  // Find the main resource (after providers/Microsoft.X/resourceType/resourceName)
+  const providersIndex = parts.findIndex(p => p.toLowerCase() === 'providers');
+  if (providersIndex >= 0 && providersIndex + 4 < parts.length) {
+    // Everything after resourceName is sub-resource path
+    const subParts = parts.slice(providersIndex + 4);
+
+    for (const part of subParts) {
+      const lowerPart = part.toLowerCase();
+      // Skip service types and blade names, keep actual resource names
+      if (!SERVICE_TYPES.has(lowerPart) && !BLADE_NAMES.has(lowerPart)) {
+        result.push(part);
+      } else if (BLADE_NAMES.has(lowerPart)) {
+        // Include blade name at the end
+        result.push(part);
+      }
+    }
+  } else {
+    // No providers section, check for blade at end
+    if (parts.length > 0) {
+      const lastPart = parts[parts.length - 1];
+      if (BLADE_NAMES.has(lastPart.toLowerCase())) {
+        result.push(lastPart);
+      }
     }
   }
 
-  return null;
+  return result;
 }
 
 /**
- * Extract full display name with resource and blade
- * e.g., "mystorageaccount > Containers"
+ * Extract full display name with resource and sub-resource hierarchy
+ * e.g., "storageaccount1 | containers | $web"
  */
 export function extractDisplayName(resourceId: string): string {
   const resourceName = extractResourceName(resourceId);
-  const bladeName = extractBladeName(resourceId);
+  const subPath = extractSubResourcePath(resourceId);
 
-  if (bladeName && bladeName.toLowerCase() !== 'overview') {
-    // Format blade name nicely (capitalize first letter)
-    const formattedBlade = bladeName.charAt(0).toUpperCase() + bladeName.slice(1);
-    return `${resourceName} > ${formattedBlade}`;
+  // Filter out 'overview' from the path
+  const filteredPath = subPath.filter(p => p.toLowerCase() !== 'overview');
+
+  if (filteredPath.length > 0) {
+    // Format: resourceName | path1 | path2 | ...
+    return [resourceName, ...filteredPath].join(' | ');
   }
 
   return resourceName;
