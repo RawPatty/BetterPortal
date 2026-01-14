@@ -215,10 +215,13 @@ export const overlayActions = {
 
     console.log('[BetterPortal] Deleting item:', item.type, item.displayName);
 
+    const { historyStore } = await import('../history/history.store');
+
     if (item.type === 'bookmark') {
+      // Delete bookmark AND corresponding history entry (so it doesn't reappear as history)
       await bookmarkStore.delete(item.id);
+      await historyStore.deleteByResource(item.resourceId, item.tenantId);
     } else if (item.type === 'history') {
-      const { historyStore } = await import('../history/history.store');
       await historyStore.delete(item.id);
     }
 

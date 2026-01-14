@@ -149,11 +149,28 @@ export const historyStore = {
   },
 
   /**
-   * Delete a specific entry
+   * Delete a specific entry by ID
    */
   async delete(id: string): Promise<boolean> {
     const all = await this.getAll();
     const filtered = all.filter((h) => h.id !== id);
+
+    if (filtered.length === all.length) {
+      return false;
+    }
+
+    await storageSet('history', filtered);
+    return true;
+  },
+
+  /**
+   * Delete entry by resourceId and tenantId
+   */
+  async deleteByResource(resourceId: string, tenantId: string): Promise<boolean> {
+    const all = await this.getAll();
+    const filtered = all.filter(
+      (h) => !(h.resourceId === resourceId && h.tenantId === tenantId)
+    );
 
     if (filtered.length === all.length) {
       return false;
