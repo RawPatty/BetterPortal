@@ -1,9 +1,12 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM } from '../bookmarks/url-parser';
+import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
+
+// Delay before extracting DOM name to allow page to render
+const DOM_EXTRACTION_DELAY_MS = 500;
 
 export const historyStore = {
   /**
@@ -87,9 +90,24 @@ export const historyStore = {
         return all[existingIndex];
       }
 
-      // Get display name - prefer DOM name, fall back to parsed name
+      // Wait for DOM to update before extracting name
+      await new Promise(resolve => setTimeout(resolve, DOM_EXTRACTION_DELAY_MS));
+
+      // Get expected resource name from URL
+      const urlResourceName = extractResourceName(parsed.resourceId);
+
+      // Try to get DOM name
       const domName = getResourceNameFromDOM();
-      const displayName = domName || generateDisplayName(parsed.resourceId, parsed.blade);
+
+      // Use DOM name if available and valid, otherwise use URL-extracted name
+      let displayName: string;
+      if (domName) {
+        displayName = domName;
+        console.log('[BetterPortal] Using DOM name:', domName);
+      } else {
+        displayName = urlResourceName;
+        console.log('[BetterPortal] Using URL resource name:', urlResourceName);
+      }
 
       // Create new entry
       const entry: HistoryEntry = {

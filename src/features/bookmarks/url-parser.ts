@@ -144,6 +144,23 @@ function stripBladeSuffix(name: string): string {
 }
 
 /**
+ * Wait for DOM to update with retries
+ */
+export async function getResourceNameFromDOMWithRetry(maxRetries: number = 3, delayMs: number = 500): Promise<string | null> {
+  for (let i = 0; i < maxRetries; i++) {
+    const name = getResourceNameFromDOM();
+    if (name) {
+      return name;
+    }
+    // Wait before retrying
+    if (i < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
+}
+
+/**
  * Try to get resource display name from the portal DOM
  */
 export function getResourceNameFromDOM(): string | null {
