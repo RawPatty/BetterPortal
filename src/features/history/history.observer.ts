@@ -6,8 +6,12 @@ import { isResourcePage } from '../bookmarks/url-parser';
 import { HISTORY_DEBOUNCE_MS } from '../../shared/constants';
 
 let debounceTimer: number | null = null;
+let pollInterval: number | null = null;
 let lastUrl: string = '';
 let isInitialized = false;
+
+// Poll interval for URL changes (Azure portal doesn't always trigger standard events)
+const URL_POLL_INTERVAL_MS = 1000;
 
 /**
  * Initialize history observer
@@ -47,6 +51,14 @@ export function initHistoryObserver(): void {
     handleNavigation('hashchange');
   });
 
+  // Poll for URL changes as fallback (Azure portal may not trigger standard events)
+  pollInterval = window.setInterval(() => {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+      handleNavigation('poll');
+    }
+  }, URL_POLL_INTERVAL_MS);
+
   // Initial capture of current page
   captureCurrentPage();
 
@@ -58,12 +70,15 @@ export function initHistoryObserver(): void {
  */
 function handleNavigation(source: string): void {
   const currentUrl = window.location.href;
+  console.log('[BetterPortal] Navigation event:', source, 'URL:', currentUrl.substring(0, 80));
 
   // Skip if URL hasn't changed
   if (currentUrl === lastUrl) {
+    console.log('[BetterPortal] URL unchanged, skipping');
     return;
   }
 
+  console.log('[BetterPortal] URL changed from:', lastUrl.substring(0, 80));
   lastUrl = currentUrl;
 
   // Clear existing timer
@@ -73,6 +88,7 @@ function handleNavigation(source: string): void {
 
   // Debounce to avoid capturing rapid navigations
   debounceTimer = window.setTimeout(() => {
+    console.log('[BetterPortal] Debounce complete, capturing page');
     captureCurrentPage();
     debounceTimer = null;
   }, HISTORY_DEBOUNCE_MS);
@@ -119,6 +135,10 @@ export function stopHistoryObserver(): void {
   if (debounceTimer !== null) {
     window.clearTimeout(debounceTimer);
     debounceTimer = null;
+  }
+  if (pollInterval !== null) {
+    window.clearInterval(pollInterval);
+    pollInterval = null;
   }
   isInitialized = false;
 }

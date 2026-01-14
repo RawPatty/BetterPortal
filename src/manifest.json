@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BetterPortal",
   "description": "Fast Azure portal navigation with bookmarks, history, and resource diffing",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "permissions": [
     "storage",
     "activeTab"
