@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 500,
-  autoBookmark: true,
+  autoBookmark: false, // Disabled - pages go to history first, user explicitly bookmarks
   theme: 'portal',
   defaultStateDepth: 'full',
   showStaleIndicator: true,

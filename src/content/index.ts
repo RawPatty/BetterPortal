@@ -8,6 +8,7 @@ import { initHistoryObserver } from '../features/history/history.observer';
 import { initTokenExtractor } from '../features/diff/token-extractor';
 
 let overlayMounted = false;
+let messageListenerAdded = false;
 
 function init() {
   console.log('[BetterPortal] init() called, readyState:', document.readyState);
@@ -31,23 +32,27 @@ function onReady() {
       console.log('[BetterPortal] Overlay mounted successfully');
     }
 
-    // Start history observer
+    // Start history observer immediately
+    console.log('[BetterPortal] Starting history observer');
     initHistoryObserver();
 
     // Start token extractor for ARM API calls
     initTokenExtractor();
 
-    // Listen for messages from background/popup
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'TOGGLE_OVERLAY') {
-        window.dispatchEvent(new CustomEvent('betterportal:toggle'));
-        sendResponse({ success: true });
-      } else if (message.type === 'OPEN_SETTINGS') {
-        window.dispatchEvent(new CustomEvent('betterportal:open-settings'));
-        sendResponse({ success: true });
-      }
-      return true;
-    });
+    // Listen for messages from background/popup (only add once)
+    if (!messageListenerAdded) {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === 'TOGGLE_OVERLAY') {
+          window.dispatchEvent(new CustomEvent('betterportal:toggle'));
+          sendResponse({ success: true });
+        } else if (message.type === 'OPEN_SETTINGS') {
+          window.dispatchEvent(new CustomEvent('betterportal:open-settings'));
+          sendResponse({ success: true });
+        }
+        return true;
+      });
+      messageListenerAdded = true;
+    }
 
     console.log('[BetterPortal] Content script fully initialized');
   } catch (error) {

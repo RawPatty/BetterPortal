@@ -1,7 +1,5 @@
 // History Observer for Azure Portal navigation
 import { historyStore } from './history.store';
-import { bookmarkStore } from '../bookmarks/bookmarks.store';
-import { settingsStore } from '../settings/settings.store';
 import { isResourcePage } from '../bookmarks/url-parser';
 import { HISTORY_DEBOUNCE_MS } from '../../shared/constants';
 
@@ -107,18 +105,10 @@ async function captureCurrentPage(): Promise<void> {
   }
 
   try {
-    const settings = await settingsStore.get();
-
-    // Capture in history
+    // Capture in history only (no auto-bookmark - user must explicitly bookmark)
     const entry = await historyStore.upsert(url);
     if (entry) {
       console.log('[BetterPortal] History captured:', entry.displayName);
-    }
-
-    // Auto-bookmark if enabled
-    if (settings.autoBookmark) {
-      const bookmark = await bookmarkStore.saveCurrentPage();
-      console.log('[BetterPortal] Auto-bookmarked:', bookmark.displayName);
     }
 
     // Dispatch event for overlay to refresh if open
