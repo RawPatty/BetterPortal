@@ -14,6 +14,17 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
     fullUrl: url,
   };
 
+  // Try to decode URL-encoded parts
+  let decodedUrl = url;
+  try {
+    // Decode URL-encoded segments (like %2F -> /)
+    if (url.includes('%2F') || url.includes('%24')) {
+      decodedUrl = decodeURIComponent(url);
+    }
+  } catch {
+    // Keep original if decode fails
+  }
+
   // Extract tenant ID from URL path
   const tenantIdMatch = url.match(PORTAL_URL_PATTERNS.TENANT_ID);
   if (tenantIdMatch) {
@@ -27,7 +38,7 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
   }
 
   // Extract resource ID (try multiple formats)
-  const resourceIdMatch = url.match(PORTAL_URL_PATTERNS.RESOURCE_ID);
+  const resourceIdMatch = decodedUrl.match(PORTAL_URL_PATTERNS.RESOURCE_ID);
   if (resourceIdMatch) {
     result.resourceId = resourceIdMatch[1];
   } else {
@@ -40,11 +51,32 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
         result.resourceId = bladeResourceIdMatch[1];
       }
     } else {
-      // Try subscription ID as fallback (for subscription-level pages)
-      const subscriptionMatch = url.match(PORTAL_URL_PATTERNS.SUBSCRIPTION_ID);
-      if (subscriptionMatch) {
-        result.resourceId = `/subscriptions/${subscriptionMatch[1]}`;
-        console.log('[BetterPortal] Extracted subscription ID:', result.resourceId);
+      // Try to extract from URL-encoded path with /path/ segment
+      // e.g., storageAccounts%2Fname/path/%24web/etag/...
+      const pathMatch = decodedUrl.match(/storageAccounts\/([^/]+)\/path\/([^/]+)/i);
+      if (pathMatch) {
+        // Reconstruct resource ID with container path
+        const storageAccount = pathMatch[1];
+        const containerName = pathMatch[2];
+        // Find the full resource path before /path/
+        const fullPathMatch = decodedUrl.match(/(\/subscriptions\/[^/]+\/resourceGroups\/[^/]+\/providers\/Microsoft\.Storage\/storageAccounts\/[^/]+)/i);
+        if (fullPathMatch) {
+          result.resourceId = `${fullPathMatch[1]}/blobServices/default/containers/${containerName}`;
+        } else {
+          // Try to construct from available info
+          const rgMatch = decodedUrl.match(/resourceGroups\/([^/]+)/i);
+          if (rgMatch) {
+            result.resourceId = `/resourceGroups/${rgMatch[1]}/providers/Microsoft.Storage/storageAccounts/${storageAccount}/blobServices/default/containers/${containerName}`;
+          }
+        }
+        console.log('[BetterPortal] Extracted from path format:', result.resourceId);
+      } else {
+        // Try subscription ID as fallback (for subscription-level pages)
+        const subscriptionMatch = decodedUrl.match(PORTAL_URL_PATTERNS.SUBSCRIPTION_ID);
+        if (subscriptionMatch) {
+          result.resourceId = `/subscriptions/${subscriptionMatch[1]}`;
+          console.log('[BetterPortal] Extracted subscription ID:', result.resourceId);
+        }
       }
     }
   }
@@ -72,7 +104,24 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
  * Check if a URL is a resource page
  */
 export function isResourcePage(url: string): boolean {
-  const isResource = PORTAL_URL_PATTERNS.IS_RESOURCE_PAGE.test(url);
+  // Try both original and decoded URL
+  let isResource = PORTAL_URL_PATTERNS.IS_RESOURCE_PAGE.test(url);
+
+  if (!isResource) {
+    // Try decoding and checking again
+    try {
+      const decodedUrl = decodeURIComponent(url);
+      isResource = PORTAL_URL_PATTERNS.IS_RESOURCE_PAGE.test(decodedUrl);
+    } catch {
+      // Ignore decode errors
+    }
+  }
+
+  // Also check for storage container path format
+  if (!isResource && (url.includes('storageAccounts') || url.includes('storageAccounts%2F'))) {
+    isResource = true;
+  }
+
   console.log('[BetterPortal] isResourcePage:', isResource, 'URL:', url.substring(0, 100));
   return isResource;
 }
