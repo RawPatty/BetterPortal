@@ -34,6 +34,7 @@ export interface HotkeyConfig {
   ctrl: boolean;
   shift: boolean;
   alt: boolean;
+  meta: boolean;
 }
 
 export interface Settings {
@@ -51,7 +52,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  hotkey: { key: 'Space', ctrl: true, shift: false, alt: false },
+  hotkey: { key: 'Space', ctrl: true, shift: false, alt: false, meta: false },
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 500,

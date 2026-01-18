@@ -25,20 +25,6 @@ export const PORTAL_URL_PATTERNS = {
   IS_RESOURCE_PAGE: /portal\.azure\.com.*(\/resource\/|resourceId[=%2F]|#.*\/subscriptions\/|#blade\/|#view\/)/i,
 };
 
-// Reserved keyboard shortcuts that should not be overwritten
-export const RESERVED_SHORTCUTS = [
-  { key: 'c', ctrl: true, shift: false, alt: false }, // Copy
-  { key: 'v', ctrl: true, shift: false, alt: false }, // Paste
-  { key: 'x', ctrl: true, shift: false, alt: false }, // Cut
-  { key: 'f', ctrl: true, shift: false, alt: false }, // Find
-  { key: 'w', ctrl: true, shift: false, alt: false }, // Close tab
-  { key: 't', ctrl: true, shift: false, alt: false }, // New tab
-  { key: 'a', ctrl: true, shift: false, alt: false }, // Select all
-  { key: 'z', ctrl: true, shift: false, alt: false }, // Undo
-  { key: 'y', ctrl: true, shift: false, alt: false }, // Redo
-  { key: 's', ctrl: true, shift: false, alt: false }, // Save
-];
-
 // ARM API endpoints and versions
 export const ARM_API = {
   BASE_URL: 'https://management.azure.com',

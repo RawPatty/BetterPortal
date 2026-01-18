@@ -3,7 +3,6 @@
   import type { Settings, HotkeyConfig } from '../../shared/types';
   import { settingsStore } from './settings.store';
   import { DEFAULT_SETTINGS } from '../../shared/types';
-  import { RESERVED_SHORTCUTS } from '../../shared/constants';
 
   export let isOpen: boolean = false;
 
@@ -49,8 +48,8 @@
     }
 
     // Require at least one modifier
-    if (!event.ctrlKey && !event.shiftKey && !event.altKey) {
-      hotkeyError = 'Hotkey must include Ctrl, Shift, or Alt';
+    if (!event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
+      hotkeyError = 'Hotkey must include Ctrl, Shift, Alt, or Cmd/Meta';
       return;
     }
 
@@ -59,20 +58,8 @@
       ctrl: event.ctrlKey,
       shift: event.shiftKey,
       alt: event.altKey,
+      meta: event.metaKey,
     };
-
-    // Check for reserved shortcuts
-    const isReserved = RESERVED_SHORTCUTS.some(
-      (s) => s.key.toLowerCase() === event.key.toLowerCase() &&
-             s.ctrl === event.ctrlKey &&
-             s.shift === event.shiftKey &&
-             s.alt === event.altKey
-    );
-
-    if (isReserved) {
-      hotkeyError = 'This shortcut is reserved by the browser';
-      return;
-    }
 
     settings.hotkey = newHotkey;
     isRecordingHotkey = false;
@@ -91,10 +78,12 @@
   }
 
   function formatHotkey(hotkey: HotkeyConfig): string {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const parts: string[] = [];
     if (hotkey.ctrl) parts.push('Ctrl');
     if (hotkey.shift) parts.push('Shift');
     if (hotkey.alt) parts.push('Alt');
+    if (hotkey.meta) parts.push(isMac ? '⌘' : 'Meta');
     parts.push(hotkey.key);
     return parts.join('+');
   }

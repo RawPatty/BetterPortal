@@ -74,13 +74,14 @@
 
     // Check if hotkey matches
     const currentSettings = $settings;
-    const hotkey = currentSettings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false };
+    const hotkey = currentSettings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false, meta: false };
 
     if (
       pressedKey === hotkey.key &&
       event.ctrlKey === hotkey.ctrl &&
       event.shiftKey === hotkey.shift &&
-      event.altKey === hotkey.alt
+      event.altKey === hotkey.alt &&
+      event.metaKey === hotkey.meta
     ) {
       event.preventDefault();
       event.stopPropagation();

@@ -15,10 +15,12 @@
     bookmarkCount = bookmarks.length;
 
     if (settings.hotkey) {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const parts = [];
       if (settings.hotkey.ctrl) parts.push('Ctrl');
       if (settings.hotkey.shift) parts.push('Shift');
       if (settings.hotkey.alt) parts.push('Alt');
+      if (settings.hotkey.meta) parts.push(isMac ? '⌘' : 'Meta');
       parts.push(settings.hotkey.key);
       hotkeyDisplay = parts.join('+');
     }
