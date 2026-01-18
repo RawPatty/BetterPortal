@@ -81,7 +81,7 @@
       event.ctrlKey === hotkey.ctrl &&
       event.shiftKey === hotkey.shift &&
       event.altKey === hotkey.alt &&
-      event.metaKey === hotkey.meta
+      event.metaKey === (hotkey.meta || false)
     ) {
       event.preventDefault();
       event.stopPropagation();
