@@ -79,7 +79,7 @@
   }
 </script>
 
-<div class="bp-settings-page">
+<div class="bp-settings-page bp-theme-{settings.theme || 'portal'}">
   <div class="bp-settings-panel">
     <header class="bp-settings-header">
       <h2>BetterPortal Settings</h2>
@@ -225,6 +225,8 @@
 <AboutModal isOpen={showAbout} on:close={() => showAbout = false} />
 
 <style>
+  @import '../shared/theme.css';
+
   .bp-settings-page {
     width: 100%;
     max-width: 600px;
@@ -232,7 +234,7 @@
   }
 
   .bp-settings-panel {
-    background: #fff;
+    background: var(--bp-bg, #fff);
     border-radius: 8px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     overflow: hidden;
@@ -243,8 +245,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid #e1e1e1;
-    background: #0078d4;
+    border-bottom: 1px solid var(--bp-border, #e1e1e1);
+    background: var(--bp-accent, #0078d4);
     color: white;
   }
 
@@ -277,7 +279,7 @@
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
-    color: #0078d4;
+    color: var(--bp-accent, #0078d4);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -292,7 +294,7 @@
 
   .bp-settings-row label {
     font-size: 14px;
-    color: #323130;
+    color: var(--bp-text, #323130);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -302,10 +304,12 @@
   .bp-settings-row input[type="number"],
   .bp-settings-row input[type="text"] {
     padding: 6px 10px;
-    border: 1px solid #e1e1e1;
+    border: 1px solid var(--bp-border, #e1e1e1);
     border-radius: 4px;
     font-size: 14px;
     min-width: 120px;
+    background: var(--bp-bg, #fff);
+    color: var(--bp-text, #323130);
   }
 
   .bp-settings-row input[type="checkbox"] {
@@ -324,35 +328,39 @@
     padding: 6px 12px;
     font-family: monospace;
     font-size: 13px;
-    background: #f5f5f5;
-    border: 1px solid #e1e1e1;
+    background: var(--bp-bg-secondary, #f5f5f5);
+    border: 1px solid var(--bp-border, #e1e1e1);
     border-radius: 4px;
+    color: var(--bp-text, #323130);
   }
 
   .bp-hotkey-recorder {
     padding: 6px 12px;
     font-size: 14px;
-    border: 2px solid #0078d4;
+    border: 2px solid var(--bp-accent, #0078d4);
     border-radius: 4px;
     outline: none;
     width: 180px;
+    background: var(--bp-bg, #fff);
+    color: var(--bp-text, #323130);
   }
 
   .bp-btn-small {
     padding: 4px 10px;
     font-size: 12px;
-    background: #f5f5f5;
-    border: 1px solid #e1e1e1;
+    background: var(--bp-bg-secondary, #f5f5f5);
+    border: 1px solid var(--bp-border, #e1e1e1);
     border-radius: 4px;
     cursor: pointer;
+    color: var(--bp-text, #323130);
   }
 
   .bp-btn-small:hover {
-    background: #e1e1e1;
+    background: var(--bp-border, #e1e1e1);
   }
 
   .bp-error {
-    color: #d13438;
+    color: var(--bp-error, #d13438);
     font-size: 12px;
     margin-top: 4px;
   }
@@ -362,8 +370,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px 20px;
-    border-top: 1px solid #e1e1e1;
-    background: #f8f8f8;
+    border-top: 1px solid var(--bp-border, #e1e1e1);
+    background: var(--bp-bg-secondary, #f8f8f8);
   }
 
   .bp-settings-footer-left {
@@ -386,12 +394,12 @@
   }
 
   .bp-btn--secondary {
-    background: #fff;
-    color: #323130;
-    border: 1px solid #e1e1e1;
+    background: var(--bp-bg, #fff);
+    color: var(--bp-text, #323130);
+    border: 1px solid var(--bp-border, #e1e1e1);
   }
 
   .bp-btn--secondary:hover {
-    background: #f5f5f5;
+    background: var(--bp-bg-secondary, #f5f5f5);
   }
 </style>

@@ -2,14 +2,17 @@
   import { onMount } from 'svelte';
   import { settingsStore } from '../features/settings/settings.store';
   import { bookmarkStore } from '../features/bookmarks/bookmarks.store';
+  import type { Settings } from '../shared/types';
+  import { DEFAULT_SETTINGS } from '../shared/types';
 
   let bookmarkCount = 0;
   let historyCount = 0;
   let hotkeyDisplay = 'Ctrl+Space';
   let version = chrome.runtime.getManifest().version;
+  let settings: Settings = { ...DEFAULT_SETTINGS };
 
   onMount(async () => {
-    const settings = await settingsStore.get();
+    settings = await settingsStore.get();
     const bookmarks = await bookmarkStore.getAll();
 
     bookmarkCount = bookmarks.length;
@@ -72,7 +75,7 @@
   }
 </script>
 
-<div class="popup">
+<div class="popup bp-theme-{settings.theme || 'portal'}">
   <header>
     <h1>BetterPortal</h1>
     <span class="version">v{version}</span>
@@ -108,9 +111,11 @@
 </div>
 
 <style>
+  @import '../shared/theme.css';
+
   .popup {
     padding: 16px;
-    background: #fafafa;
+    background: var(--bp-bg-secondary, #fafafa);
   }
 
   header {
@@ -119,19 +124,19 @@
     gap: 8px;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--bp-border, #e0e0e0);
   }
 
   h1 {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: #0078d4;
+    color: var(--bp-accent, #0078d4);
   }
 
   .version {
     font-size: 12px;
-    color: #666;
+    color: var(--bp-text-secondary, #666);
   }
 
   .stats {
@@ -144,21 +149,21 @@
     flex: 1;
     text-align: center;
     padding: 12px;
-    background: white;
+    background: var(--bp-bg, white);
     border-radius: 8px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--bp-border, #e0e0e0);
   }
 
   .stat-value {
     display: block;
     font-size: 20px;
     font-weight: 600;
-    color: #323130;
+    color: var(--bp-text, #323130);
   }
 
   .stat-label {
     font-size: 12px;
-    color: #666;
+    color: var(--bp-text-secondary, #666);
   }
 
   .actions {
@@ -175,29 +180,29 @@
     font-size: 14px;
     font-weight: 500;
     text-align: center;
-    border: 1px solid #0078d4;
+    border: 1px solid var(--bp-accent, #0078d4);
     border-radius: 4px;
-    background: white;
-    color: #0078d4;
+    background: var(--bp-bg, white);
+    color: var(--bp-accent, #0078d4);
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
   button:hover {
-    background: #0078d4;
+    background: var(--bp-accent, #0078d4);
     color: white;
   }
 
   footer {
     text-align: center;
     padding-top: 12px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--bp-border, #e0e0e0);
   }
 
   footer p {
     margin: 0;
     font-size: 12px;
-    color: #666;
+    color: var(--bp-text-secondary, #666);
   }
 
   kbd {
@@ -205,7 +210,8 @@
     padding: 2px 6px;
     font-family: monospace;
     font-size: 11px;
-    background: #e0e0e0;
+    background: var(--bp-bg-secondary, #e0e0e0);
     border-radius: 3px;
+    color: var(--bp-text, #323130);
   }
 </style>

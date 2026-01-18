@@ -1,9 +1,17 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
+  import type { Settings } from '../../shared/types';
+  import { settingsStore } from './settings.store';
+  import { DEFAULT_SETTINGS } from '../../shared/types';
 
   export let isOpen: boolean = false;
 
   const dispatch = createEventDispatcher();
+  let settings: Settings = { ...DEFAULT_SETTINGS };
+
+  onMount(async () => {
+    settings = await settingsStore.get();
+  });
 
   function close() {
     dispatch('close');
@@ -27,7 +35,7 @@
 {#if isOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="bp-about-modal" on:click={handleBackdropClick}>
+  <div class="bp-about-modal bp-theme-{settings.theme || 'portal'}" on:click={handleBackdropClick}>
     <div class="bp-about-panel" role="dialog" aria-modal="true" aria-label="About">
       <header class="bp-about-header">
         <h2>About BetterPortal</h2>
@@ -107,6 +115,8 @@
 {/if}
 
 <style>
+  @import '../../shared/theme.css';
+
   .bp-about-modal {
     position: fixed;
     top: 0;
@@ -125,7 +135,7 @@
     width: 500px;
     max-width: 95vw;
     max-height: 85vh;
-    background: #fff;
+    background: var(--bp-bg, #fff);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
     display: flex;
@@ -138,14 +148,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid #e1e1e1;
+    border-bottom: 1px solid var(--bp-border, #e1e1e1);
   }
 
   .bp-about-header h2 {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: #323130;
+    color: var(--bp-text, #323130);
   }
 
   .bp-about-close {
@@ -153,13 +163,13 @@
     border: none;
     padding: 4px;
     cursor: pointer;
-    color: #666;
+    color: var(--bp-text-secondary, #666);
     border-radius: 4px;
   }
 
   .bp-about-close:hover {
-    background: #f0f0f0;
-    color: #323130;
+    background: var(--bp-bg-secondary, #f0f0f0);
+    color: var(--bp-text, #323130);
   }
 
   .bp-about-content {
@@ -176,14 +186,14 @@
     margin: 0 0 16px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #0078d4;
+    color: var(--bp-accent, #0078d4);
   }
 
   .bp-about-section h4 {
     margin: 16px 0 8px 0;
     font-size: 14px;
     font-weight: 600;
-    color: #323130;
+    color: var(--bp-text, #323130);
   }
 
   .bp-about-section h4:first-of-type {
@@ -198,12 +208,12 @@
   .bp-about-section li {
     margin-bottom: 8px;
     font-size: 14px;
-    color: #605e5c;
+    color: var(--bp-text-secondary, #605e5c);
     line-height: 1.5;
   }
 
   .bp-about-section a {
-    color: #0078d4;
+    color: var(--bp-accent, #0078d4);
     text-decoration: none;
   }
 
@@ -215,8 +225,8 @@
     display: flex;
     justify-content: flex-end;
     padding: 12px 20px;
-    border-top: 1px solid #e1e1e1;
-    background: #f8f8f8;
+    border-top: 1px solid var(--bp-border, #e1e1e1);
+    background: var(--bp-bg-secondary, #f8f8f8);
   }
 
   .bp-btn {
@@ -229,11 +239,11 @@
   }
 
   .bp-btn--primary {
-    background: #0078d4;
+    background: var(--bp-accent, #0078d4);
     color: #fff;
   }
 
   .bp-btn--primary:hover {
-    background: #106ebe;
+    background: var(--bp-accent-hover, #106ebe);
   }
 </style>
