@@ -3,7 +3,7 @@ Use vitest to test your features and write sensible tests for each bug you end u
 ## Release Process
 
 When making updates:
-- **Bump the version** in `src/manifest.json` before committing
+- **Bump the version** in both `src/manifest.json` and `package.json` (keep them in sync)
 - **Push to GitHub** after committing changes
 
 ## How to Add Features
