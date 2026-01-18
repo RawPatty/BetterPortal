@@ -112,7 +112,7 @@
 {#if isOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="bp-settings-modal bp-theme-{settings.theme || 'portal'}" on:click={handleBackdropClick}>
+  <div class="bp-settings-modal bp-theme-{settings.theme || 'light'}" on:click={handleBackdropClick}>
     <div class="bp-settings-panel" role="dialog" aria-modal="true" aria-label="Settings">
       <header class="bp-settings-header">
         <h2>Settings</h2>
@@ -158,9 +158,8 @@
           <div class="bp-settings-row">
             <label for="theme">Theme</label>
             <select id="theme" bind:value={settings.theme} on:change={handleThemeChange}>
-              <option value="portal">Azure Portal</option>
-              <option value="dark">Dark</option>
               <option value="light">Light</option>
+              <option value="dark">Dark</option>
             </select>
           </div>
           <div class="bp-settings-row">

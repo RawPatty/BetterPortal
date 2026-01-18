@@ -182,7 +182,7 @@ interface Snapshot {
 
 interface Settings {
   hotkey: string;
-  theme: 'portal' | 'dark' | 'light';
+  theme: 'light' | 'dark';
   autoCapture: boolean;
   historyRetentionDays: number;
 }

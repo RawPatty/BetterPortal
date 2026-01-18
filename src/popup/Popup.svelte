@@ -75,7 +75,7 @@
   }
 </script>
 
-<div class="popup bp-theme-{settings.theme || 'portal'}">
+<div class="popup bp-theme-{settings.theme || 'light'}">
   <header>
     <h1>BetterPortal</h1>
     <span class="version">v{version}</span>

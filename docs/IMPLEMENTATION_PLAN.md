@@ -164,9 +164,9 @@ src/
 **Files**: `src/features/bookmarks/bookmarks.service.ts`
 
 #### Task 13: Theming
-- CSS variables for portal/dark/light themes
+- CSS variables for light/dark themes
 - Apply theme class on overlay container
-- Portal theme: match Azure Fluent UI colors
+- Light theme: match Azure Fluent UI colors
 
 **Files**: `src/styles/variables.css`, `src/styles/fluent.css`
 

@@ -1,6 +1,6 @@
 {
   "name": "betterportal",
-  "version": "1.0.57",
+  "version": "1.0.58",
   "description": "Fast Azure portal navigation with bookmarks, history, and resource diffing",
   "type": "module",
   "scripts": {

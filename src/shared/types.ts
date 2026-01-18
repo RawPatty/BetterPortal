@@ -43,7 +43,7 @@ export interface Settings {
   historyRetentionDays: number;
   historyMaxEntries: number;
   autoBookmark: boolean;
-  theme: 'portal' | 'dark' | 'light';
+  theme: 'light' | 'dark';
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
   diffIgnoredPaths: string[];
@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   historyRetentionDays: 30,
   historyMaxEntries: 500,
   autoBookmark: false, // Disabled - pages go to history first, user explicitly bookmarks
-  theme: 'portal',
+  theme: 'light',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
   diffIgnoredPaths: ['etag', 'systemData', 'properties.provisioningState'],

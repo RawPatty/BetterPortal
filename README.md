@@ -111,7 +111,7 @@ Settings are accessible via:
 
 Configurable options:
 - Hotkey customization
-- Theme (Portal, Dark, Light)
+- Theme (Light, Dark)
 - History enable/disable
 - History retention period
 - Diff ignored paths

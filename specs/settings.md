@@ -25,7 +25,7 @@ interface Settings {
   historyMaxEntries: number;
 
   // Display
-  theme: 'portal' | 'dark' | 'light';
+  theme: 'light' | 'dark';
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
 
@@ -49,7 +49,7 @@ const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 500,
-  theme: 'portal',
+  theme: 'light',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
   diffIgnoredPaths: ['etag', 'systemData', 'properties.provisioningState'],

@@ -79,7 +79,7 @@
   }
 </script>
 
-<div class="bp-settings-page bp-theme-{settings.theme || 'portal'}">
+<div class="bp-settings-page bp-theme-{settings.theme || 'light'}">
   <div class="bp-settings-panel">
     <header class="bp-settings-header">
       <h2>BetterPortal Settings</h2>
@@ -123,9 +123,8 @@
         <div class="bp-settings-row">
           <label for="theme">Theme</label>
           <select id="theme" bind:value={settings.theme} on:change={saveSettings}>
-            <option value="portal">Azure Portal</option>
-            <option value="dark">Dark</option>
             <option value="light">Light</option>
+            <option value="dark">Dark</option>
           </select>
         </div>
         <div class="bp-settings-row">
