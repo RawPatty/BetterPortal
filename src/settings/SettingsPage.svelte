@@ -3,11 +3,13 @@
   import type { Settings, HotkeyConfig } from '../shared/types';
   import { settingsStore } from '../features/settings/settings.store';
   import { DEFAULT_SETTINGS } from '../shared/types';
+  import AboutModal from '../features/settings/AboutModal.svelte';
 
   let settings: Settings = { ...DEFAULT_SETTINGS };
   let isRecordingHotkey = false;
   let hotkeyError = '';
   let saveMessage = '';
+  let showAbout = false;
 
   onMount(async () => {
     settings = await settingsStore.get();
@@ -215,10 +217,17 @@
     </div>
 
     <footer class="bp-settings-footer">
-      <button class="bp-btn bp-btn--secondary" on:click={resetSettings}>Reset to Defaults</button>
+      <div class="bp-settings-footer-left">
+        <button class="bp-btn bp-btn--secondary" on:click={() => showAbout = true}>About</button>
+      </div>
+      <div class="bp-settings-footer-right">
+        <button class="bp-btn bp-btn--secondary" on:click={resetSettings}>Reset to Defaults</button>
+      </div>
     </footer>
   </div>
 </div>
+
+<AboutModal isOpen={showAbout} on:close={() => showAbout = false} />
 
 <style>
   .bp-settings-page {
@@ -355,10 +364,21 @@
 
   .bp-settings-footer {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     padding: 12px 20px;
     border-top: 1px solid #e1e1e1;
     background: #f8f8f8;
+  }
+
+  .bp-settings-footer-left {
+    display: flex;
+    gap: 8px;
+  }
+
+  .bp-settings-footer-right {
+    display: flex;
+    gap: 8px;
   }
 
   .bp-btn {
