@@ -1,5 +1,11 @@
 Use vitest to test your features and write sensible tests for each bug you end up fixing
 
+## Release Process
+
+When making updates:
+- **Bump the version** in `src/manifest.json` before committing
+- **Push to GitHub** after committing changes
+
 ## How to Add Features
 
 **You don't need a new PRD/spec each time.** Just describe what you want.
