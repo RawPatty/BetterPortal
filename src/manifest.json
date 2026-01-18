@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "BetterPortal",
-  "description": "Fast Azure portal navigation with bookmarks, history, and resource diffing",
+  "description": "Fast Azure portal navigation with bookmarks and history",
   "version": "1.0.59",
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
   "permissions": [
     "storage",
     "activeTab"
@@ -22,6 +27,10 @@
     }
   ],
   "action": {
-    "default_popup": "src/popup/index.html"
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "48": "src/icons/icon48.png"
+    }
   }
 }
