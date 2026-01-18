@@ -536,6 +536,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--bp-text, #323130);
   }
 
   .bp-item-badge {
@@ -595,8 +596,8 @@
     --bp-bg: #1e1e1e;
     --bp-bg-secondary: #2d2d2d;
     --bp-bg-tertiary: rgba(79, 195, 247, 0.1);
-    --bp-text: #ffffff;
-    --bp-text-secondary: #a0a0a0;
+    --bp-text: #e8e8e8;
+    --bp-text-secondary: #b8b8b8;
     --bp-border: #3d3d3d;
     --bp-accent: #4fc3f7;
     --bp-accent-hover: #29b6f6;
