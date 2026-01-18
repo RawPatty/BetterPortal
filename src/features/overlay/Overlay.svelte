@@ -54,7 +54,6 @@
   });
 
   function handleOpenSettings() {
-    overlayActions.open();
     showSettings = true;
   }
 
