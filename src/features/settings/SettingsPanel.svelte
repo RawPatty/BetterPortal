@@ -49,8 +49,11 @@
       return;
     }
 
+    // Normalize spacebar key to match detection logic
+    const normalizedKey = event.key === ' ' ? 'Space' : event.key;
+
     const newHotkey: HotkeyConfig = {
-      key: event.key,
+      key: normalizedKey,
       ctrl: event.ctrlKey,
       shift: event.shiftKey,
       alt: event.altKey,
