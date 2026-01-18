@@ -69,6 +69,12 @@
   }
 
   async function handleGlobalKeydown(event: KeyboardEvent) {
+    // Skip if target is an input/textarea (don't interfere with typing)
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
     // Normalize key for comparison (Space key returns ' ')
     const pressedKey = event.key === ' ' ? 'Space' : event.key;
 
