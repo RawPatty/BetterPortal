@@ -29,11 +29,6 @@
       return;
     }
 
-    if (!event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
-      hotkeyError = 'Hotkey must include Ctrl, Shift, Alt, or Cmd/Meta';
-      return;
-    }
-
     const newHotkey: HotkeyConfig = {
       key: event.key,
       ctrl: event.ctrlKey,
