@@ -3,6 +3,35 @@ import { PORTAL_URL_PATTERNS, PORTAL_SELECTORS } from '../../shared/constants';
 import type { ParsedPortalUrl } from '../../shared/types';
 
 /**
+ * Get the current directory info from the browser's current URL
+ * Returns the domain (for comparison) and GUID if available
+ */
+export function getCurrentDirectoryInfo(): { domain: string | null; guid: string | null } {
+  const url = window.location.href;
+
+  // Extract domain from hash: #@domain.onmicrosoft.com/...
+  const domainMatch = url.match(PORTAL_URL_PATTERNS.TENANT_DOMAIN);
+  const domain = domainMatch ? domainMatch[1].toLowerCase() : null;
+
+  // Extract GUID from path: portal.azure.com/GUID/...
+  const guidMatch = url.match(PORTAL_URL_PATTERNS.TENANT_ID);
+  const guid = guidMatch ? guidMatch[1] : null;
+
+  return { domain, guid };
+}
+
+/**
+ * Check if two directories are the same (comparing by domain)
+ */
+export function isSameDirectory(currentDomain: string | null, targetDomain: string | null): boolean {
+  if (!currentDomain || !targetDomain) {
+    // If we can't determine one of the domains, assume same directory (don't inject GUID)
+    return true;
+  }
+  return currentDomain.toLowerCase() === targetDomain.toLowerCase();
+}
+
+/**
  * Parse an Azure Portal URL to extract tenant, resource, and blade info
  */
 export function parsePortalUrl(url: string): ParsedPortalUrl {
@@ -286,6 +315,402 @@ export function getTenantNameFromDOM(): string | null {
 }
 
 /**
+ * Try to extract tenant ID from a JWT token
+ */
+function extractTenantFromJwt(token: string): string | null {
+  try {
+    // JWT format: header.payload.signature
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    // Decode the payload (base64url)
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(payload);
+    const claims = JSON.parse(decoded);
+
+    // The 'tid' claim contains the tenant ID
+    const tid = claims.tid;
+    if (tid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tid)) {
+      return tid;
+    }
+  } catch {
+    // Invalid JWT
+  }
+  return null;
+}
+
+/**
+ * Inject a script into the page context to extract tenant GUID from window objects
+ * Content scripts can't access page's window objects directly due to isolation
+ *
+ * IMPORTANT: Always re-extract - don't cache, as user may switch tenants!
+ */
+function extractTenantFromPageContext(): string | null {
+  const ATTR_NAME = 'data-betterportal-tenant-guid';
+
+  // Always clear previous value and re-extract (user may have switched tenants)
+  document.documentElement.removeAttribute(ATTR_NAME);
+
+  // Inject script into page context to extract tenant GUID
+  const script = document.createElement('script');
+  script.textContent = `
+    (function() {
+      var guid = null;
+      var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      // Try various window objects where Azure Portal stores tenant info
+      var paths = [
+        function() { return window.Portal && window.Portal.tenant && window.Portal.tenant.id; },
+        function() { return window.Portal && window.Portal.TenantId; },
+        function() { return window.Portal && window.Portal.tenantId; },
+        function() { return window.Portal && window.Portal.Environment && window.Portal.Environment.tenantId; },
+        function() { return window.Portal && window.Portal.Environment && window.Portal.Environment.directoryId; },
+        function() { return window.fx && window.fx.environment && window.fx.environment.tenantId; },
+        function() { return window.fx && window.fx.environment && window.fx.environment.directoryId; },
+        function() { return window.MsPortalFx && window.MsPortalFx.Base && window.MsPortalFx.Base.Security &&
+                     typeof window.MsPortalFx.Base.Security.getTenantId === 'function' &&
+                     window.MsPortalFx.Base.Security.getTenantId(); },
+        function() { return window.MsPortalFx && window.MsPortalFx.environment && window.MsPortalFx.environment.tenantId; },
+        function() { return window.__portal__ && window.__portal__.tenantId; },
+        function() { return window.portalEnvironment && window.portalEnvironment.tenantId; },
+        function() { return window.Portal && window.Portal.getContext && typeof window.Portal.getContext === 'function' &&
+                     window.Portal.getContext() && window.Portal.getContext().tenantId; },
+      ];
+
+      for (var i = 0; i < paths.length; i++) {
+        try {
+          var val = paths[i]();
+          if (val && typeof val === 'string' && guidRegex.test(val)) {
+            guid = val;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (guid) {
+        document.documentElement.setAttribute('${ATTR_NAME}', guid);
+        console.log('[BetterPortal] Injected script found tenant GUID:', guid);
+      } else {
+        console.log('[BetterPortal] Injected script could not find tenant GUID');
+      }
+    })();
+  `;
+
+  document.documentElement.appendChild(script);
+  script.remove();
+
+  // Read the result
+  const result = document.documentElement.getAttribute(ATTR_NAME);
+  if (result) {
+    console.log('[BetterPortal] Got tenant GUID from page context:', result);
+    return result;
+  }
+
+  return null;
+}
+
+/**
+ * Try to get tenant GUID from various sources in the portal (single attempt)
+ */
+function getTenantGuidFromPortalOnce(): string | null {
+  const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const url = window.location.href;
+
+  console.log('[BetterPortal] getTenantGuidFromPortal() called, URL:', url.substring(0, 150));
+
+  // 1. Check URL path first (most reliable)
+  const urlPathMatch = url.match(/portal\.azure\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  if (urlPathMatch) {
+    console.log('[BetterPortal] Found tenant GUID in URL path:', urlPathMatch[1]);
+    return urlPathMatch[1];
+  }
+
+  // 2. Check URL query parameters (Azure Portal sometimes uses these)
+  try {
+    const urlObj = new URL(url);
+    const directoryParams = ['directory', 'feature.directory', 'tid', 'tenantId', 'tenant'];
+    for (const param of directoryParams) {
+      const val = urlObj.searchParams.get(param);
+      if (val && guidRegex.test(val)) {
+        console.log('[BetterPortal] Found tenant GUID in query param:', param, '=', val);
+        return val;
+      }
+    }
+  } catch {
+    // URL parsing failed
+  }
+
+  // 3. Try to extract from page context (window objects) via injected script
+  const pageContextGuid = extractTenantFromPageContext();
+  if (pageContextGuid) {
+    return pageContextGuid;
+  }
+
+  // 4. Check MSAL/Auth tokens in sessionStorage (Azure Portal stores JWT tokens here)
+  // IMPORTANT: MSAL caches tokens for ALL tenants user has authenticated to.
+  // We need to find tokens that match the CURRENT tenant (from URL domain).
+  try {
+    // Get the current URL domain to match against tokens
+    const urlDomainMatch = url.match(/#@([^/#]+)/);
+    const currentDomain = urlDomainMatch ? urlDomainMatch[1].toLowerCase() : null;
+    console.log('[BetterPortal] Looking for MSAL tokens, current domain:', currentDomain);
+
+    // Collect all found GUIDs with their domains for smart matching
+    const foundTokens: Array<{ guid: string; domain: string | null; key: string }> = [];
+
+    // Helper to extract tenant info from JWT
+    const extractTenantInfo = (token: string): { guid: string | null; domain: string | null } => {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return { guid: null, domain: null };
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = atob(payload);
+        const claims = JSON.parse(decoded);
+        const tid = claims.tid;
+        // Try to get domain from 'upn' (user principal name) or 'idp' claims
+        let domain: string | null = null;
+        if (claims.upn && claims.upn.includes('@')) {
+          domain = claims.upn.split('@')[1].toLowerCase();
+        } else if (claims.idp) {
+          domain = claims.idp.toLowerCase();
+        } else if (claims.iss && claims.iss.includes('/')) {
+          // issuer often contains tenant info
+          const issMatch = claims.iss.match(/\/([a-f0-9-]{36})\//i);
+          if (issMatch) {
+            // Can't get domain from issuer GUID, but tid is the same
+          }
+        }
+        if (tid && guidRegex.test(tid)) {
+          return { guid: tid, domain };
+        }
+      } catch {
+        // Invalid JWT
+      }
+      return { guid: null, domain: null };
+    };
+
+    // Search sessionStorage
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key) continue;
+
+      // MSAL stores tokens with keys like "msal.{clientId}.idtoken" or similar
+      if (key.includes('msal') || key.includes('token') || key.includes('accessToken') || key.includes('idToken')) {
+        const val = sessionStorage.getItem(key);
+        if (!val) continue;
+
+        // Check if key contains the domain (MSAL sometimes includes tenant in key)
+        const keyLower = key.toLowerCase();
+        let keyDomain: string | null = null;
+        if (currentDomain && keyLower.includes(currentDomain)) {
+          keyDomain = currentDomain;
+        }
+
+        // Check if it's a JWT token
+        if (val.includes('.') && val.split('.').length === 3) {
+          const info = extractTenantInfo(val);
+          if (info.guid) {
+            foundTokens.push({ guid: info.guid, domain: keyDomain || info.domain, key });
+          }
+        }
+
+        // Try parsing as JSON (MSAL sometimes stores token objects)
+        try {
+          const parsed = JSON.parse(val);
+          const tokenFields = ['idToken', 'accessToken', 'secret', 'credential'];
+          for (const field of tokenFields) {
+            if (parsed[field] && typeof parsed[field] === 'string') {
+              const info = extractTenantInfo(parsed[field]);
+              if (info.guid) {
+                foundTokens.push({ guid: info.guid, domain: keyDomain || info.domain, key: `${key}.${field}` });
+              }
+            }
+          }
+          // Direct tenantId in object
+          const directTid = parsed.tenantId || parsed.tid || parsed.realm;
+          if (directTid && guidRegex.test(directTid)) {
+            foundTokens.push({ guid: directTid, domain: keyDomain, key });
+          }
+        } catch {
+          // Not JSON
+        }
+      }
+    }
+
+    // Also check localStorage for MSAL tokens
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (key.includes('msal') || key.includes('token')) {
+        const val = localStorage.getItem(key);
+        if (!val) continue;
+
+        const keyLower = key.toLowerCase();
+        let keyDomain: string | null = null;
+        if (currentDomain && keyLower.includes(currentDomain)) {
+          keyDomain = currentDomain;
+        }
+
+        if (val.includes('.') && val.split('.').length === 3) {
+          const info = extractTenantInfo(val);
+          if (info.guid) {
+            foundTokens.push({ guid: info.guid, domain: keyDomain || info.domain, key: `localStorage.${key}` });
+          }
+        }
+        try {
+          const parsed = JSON.parse(val);
+          const directTid = parsed.tenantId || parsed.tid || parsed.realm;
+          if (directTid && guidRegex.test(directTid)) {
+            foundTokens.push({ guid: directTid, domain: keyDomain, key: `localStorage.${key}` });
+          }
+        } catch {
+          // Not JSON
+        }
+      }
+    }
+
+    console.log('[BetterPortal] Found', foundTokens.length, 'MSAL tokens');
+
+    // Now find the best matching token
+    if (foundTokens.length > 0) {
+      // First priority: token with domain matching current URL domain
+      if (currentDomain) {
+        const matchingToken = foundTokens.find(t => t.domain === currentDomain);
+        if (matchingToken) {
+          console.log('[BetterPortal] Found MSAL token matching current domain:', matchingToken.guid, 'key:', matchingToken.key);
+          return matchingToken.guid;
+        }
+      }
+
+      // Second priority: any token (may be wrong after directory switch)
+      console.log('[BetterPortal] No domain match, using first MSAL token:', foundTokens[0].guid, '(may be wrong tenant!)');
+      return foundTokens[0].guid;
+    }
+  } catch (e) {
+    console.log('[BetterPortal] Error searching MSAL tokens:', e);
+  }
+
+  // 4. Check sessionStorage and localStorage for direct tenant keys
+  try {
+    const storageKeys = ['tenantId', 'tenant_id', 'currentTenant', 'selectedTenant', 'directory'];
+    for (const key of storageKeys) {
+      const sessionVal = sessionStorage.getItem(key);
+      if (sessionVal && guidRegex.test(sessionVal)) {
+        console.log('[BetterPortal] Found tenant GUID in sessionStorage:', sessionVal);
+        return sessionVal;
+      }
+      const localVal = localStorage.getItem(key);
+      if (localVal && guidRegex.test(localVal)) {
+        console.log('[BetterPortal] Found tenant GUID in localStorage:', localVal);
+        return localVal;
+      }
+    }
+
+    // Check for Azure-specific storage keys
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (key.toLowerCase().includes('tenant') || key.toLowerCase().includes('directory'))) {
+        const val = sessionStorage.getItem(key);
+        if (val) {
+          // Try to parse as JSON
+          try {
+            const parsed = JSON.parse(val);
+            const id = parsed.tenantId || parsed.id || parsed.directoryId;
+            if (id && guidRegex.test(id)) {
+              console.log('[BetterPortal] Found tenant GUID in sessionStorage JSON:', id, 'key:', key);
+              return id;
+            }
+          } catch {
+            if (guidRegex.test(val)) {
+              console.log('[BetterPortal] Found tenant GUID in sessionStorage:', val, 'key:', key);
+              return val;
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Storage access might fail
+  }
+
+  // 5. Check data attributes
+  const dataAttrs = document.querySelectorAll('[data-tenant-id], [data-tenantid], [data-directory-id]');
+  for (const el of dataAttrs) {
+    const val = el.getAttribute('data-tenant-id') || el.getAttribute('data-tenantid') || el.getAttribute('data-directory-id');
+    if (val && guidRegex.test(val)) {
+      console.log('[BetterPortal] Found tenant GUID in data attribute:', val);
+      return val;
+    }
+  }
+
+  // 6. Search all iframes for tenant info (Azure Portal uses iframes)
+  try {
+    const iframes = document.querySelectorAll('iframe');
+    for (const iframe of iframes) {
+      const src = iframe.src || '';
+      const iframeMatch = src.match(/tenant[Ii]d[=\/]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+      if (iframeMatch) {
+        console.log('[BetterPortal] Found tenant GUID in iframe src:', iframeMatch[1]);
+        return iframeMatch[1];
+      }
+    }
+  } catch {
+    // Ignore iframe access errors
+  }
+
+  console.log('[BetterPortal] Could not find tenant GUID in DOM/storage');
+  return null;
+}
+
+/**
+ * Try to get tenant GUID with retries and delays
+ * After switching directories, Azure Portal takes time to update its state
+ * This function will retry multiple times with increasing delays
+ */
+export async function getTenantGuidFromPortalWithRetry(
+  maxRetries: number = 5,
+  initialDelayMs: number = 300
+): Promise<string | null> {
+  console.log('[BetterPortal] Getting tenant GUID with retry (max attempts:', maxRetries, ')');
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Try to get the GUID
+    const guid = getTenantGuidFromPortalOnce();
+
+    if (guid) {
+      console.log('[BetterPortal] Found tenant GUID on attempt', attempt + 1, ':', guid);
+      return guid;
+    }
+
+    // If this isn't the last attempt, wait before retrying
+    if (attempt < maxRetries - 1) {
+      const delay = initialDelayMs * Math.pow(1.5, attempt); // Exponential backoff
+      console.log('[BetterPortal] Tenant GUID not found, waiting', Math.round(delay), 'ms before retry', attempt + 2);
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Check if URL has changed (might have GUID now after redirect)
+      const newUrl = window.location.href;
+      const urlGuidMatch = newUrl.match(/portal\.azure\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+      if (urlGuidMatch) {
+        console.log('[BetterPortal] Found tenant GUID in URL after waiting:', urlGuidMatch[1]);
+        return urlGuidMatch[1];
+      }
+    }
+  }
+
+  console.log('[BetterPortal] Could not find tenant GUID after', maxRetries, 'attempts');
+  return null;
+}
+
+/**
+ * Synchronous version for backwards compatibility - tries once without retry
+ */
+export function getTenantGuidFromPortal(): string | null {
+  return getTenantGuidFromPortalOnce();
+}
+
+/**
  * Strip blade suffix from resource name (e.g., "my-resource | Overview" -> "my-resource")
  */
 function stripBladeSuffix(name: string): string {
@@ -379,6 +804,69 @@ function isGuid(str: string): boolean {
 }
 
 /**
+ * Check if the current page is showing an error state
+ * This is used to avoid capturing error pages in history
+ */
+export function isErrorPage(): boolean {
+  // Check for common Azure Portal error indicators
+  const errorSelectors = [
+    // Error blade/page indicators
+    '.fxs-blade-error',
+    '.fxs-error',
+    '.msportalfx-error',
+    '[class*="error-page"]',
+    '[class*="errorpage"]',
+    // Access denied / authorization errors
+    '.fxs-blade-unauthorized',
+    '[data-telemetryname*="Error"]',
+    '[data-telemetryname*="error"]',
+    // Generic error containers
+    '.ext-error-container',
+    '.azc-error',
+  ];
+
+  for (const selector of errorSelectors) {
+    try {
+      if (document.querySelector(selector)) {
+        return true;
+      }
+    } catch {
+      // Selector might be invalid
+    }
+  }
+
+  // Check page title for error indicators
+  const pageTitle = document.title.toLowerCase();
+  if (pageTitle.includes('error') ||
+      pageTitle.includes('not found') ||
+      pageTitle.includes('access denied') ||
+      pageTitle.includes('unauthorized')) {
+    return true;
+  }
+
+  // Check for error text in the main content area
+  const bodyText = document.body?.innerText?.toLowerCase() || '';
+  const errorPhrases = [
+    'the access token is from the wrong issuer',
+    'token issuer',
+    'issuer does not match',
+    'resource not found',
+    'you do not have access',
+    'access has been denied',
+    'authorization failed',
+    'the resource you are looking for',
+  ];
+
+  for (const phrase of errorPhrases) {
+    if (bodyText.includes(phrase)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check if a resource ID represents a subscription (not a child resource)
  */
 export function isSubscriptionResource(resourceId: string): boolean {
@@ -442,4 +930,57 @@ export function normalizePortalUrl(url: string): string {
   }
 
   return normalized;
+}
+
+/**
+ * Build a navigation URL with tenant context for cross-tenant navigation
+ *
+ * Correct format for cross-tenant navigation:
+ * https://portal.azure.com/{tenantGUID}/#@{domain}/resource/{resourcePath}
+ *
+ * The GUID in the path authenticates you to the directory.
+ * The #@domain/resource/... navigates to the actual resource.
+ * BOTH are needed for cross-tenant navigation to work properly.
+ *
+ * @param url - The original bookmark/history URL
+ * @param tenantId - The tenant identifier (GUID preferred, domain fallback)
+ * @returns URL with tenant context for navigation
+ */
+export function buildNavigationUrl(url: string, tenantId: string): string {
+  if (!tenantId || tenantId === 'unknown') {
+    return url;
+  }
+
+  const isGuidTenant = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId);
+
+  if (isGuidTenant) {
+    // Check if URL already has this GUID in the path
+    if (url.includes(`portal.azure.com/${tenantId}`)) {
+      return url; // Already correct
+    }
+
+    // Extract the hash part (everything from # onwards)
+    const hashIndex = url.indexOf('#');
+    let hashPart = '';
+    if (hashIndex !== -1) {
+      hashPart = url.substring(hashIndex);
+    }
+
+    // If there's a hash with @domain or /resource, keep it
+    // Format: portal.azure.com/GUID/#@domain/resource/...
+    if (hashPart) {
+      return `https://portal.azure.com/${tenantId}/${hashPart}`;
+    }
+
+    // If no hash, just add tenant to base URL
+    return `https://portal.azure.com/${tenantId}/`;
+  }
+
+  // Fallback: use #@domain format (may not switch directories)
+  // Only use this if we don't have a GUID
+  if (!url.includes('#@')) {
+    return url.replace('/#', `/#@${tenantId}`);
+  }
+
+  return url;
 }

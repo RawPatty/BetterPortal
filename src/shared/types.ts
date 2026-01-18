@@ -4,8 +4,8 @@
 export interface Bookmark {
   id: string;
   url: string;
-  tenantId: string;
-  tenantName: string;
+  tenantId: string | null; // GUID only, null if unavailable - used for cross-tenant navigation
+  tenantName: string; // Domain or friendly name - used for grouping/display
   resourceId: string;
   displayName: string;
   alias: string | null;
@@ -20,8 +20,8 @@ export interface Bookmark {
 export interface HistoryEntry {
   id: string;
   url: string;
-  tenantId: string;
-  tenantName: string;
+  tenantId: string | null; // GUID only, null if unavailable - used for cross-tenant navigation
+  tenantName: string; // Domain or friendly name - used for grouping/display
   resourceId: string;
   displayName: string;
   visitedAt: number;

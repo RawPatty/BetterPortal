@@ -281,6 +281,7 @@
     align-items: center;
     justify-content: center;
     z-index: 1000001;
+    pointer-events: auto;
   }
 
   .bp-settings-panel {

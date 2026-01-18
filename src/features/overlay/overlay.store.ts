@@ -1,8 +1,13 @@
 // Overlay state management
 import { writable, derived, get } from 'svelte/store';
 import type { Bookmark, HistoryEntry, OverlayMode, Settings } from '../../shared/types';
-import { bookmarkStore } from '../bookmarks/bookmarks.store';
+import { bookmarkStore, lookupTenantGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
+import {
+  getCurrentDirectoryInfo,
+  isSameDirectory,
+  buildNavigationUrl,
+} from '../bookmarks/url-parser';
 
 // Store for overlay visibility
 export const isOverlayOpen = writable(false);
@@ -75,16 +80,37 @@ export const filteredItems = derived(
       });
     }
 
+    // Sort items to match visual display order (grouped by tenant)
+    // This ensures arrow key navigation follows the visual order
+    const tenantOrder = new Map<string, number>();
+    let orderIndex = 0;
+    for (const item of items) {
+      const tenantKey = item.tenantName || item.tenantId;
+      if (!tenantOrder.has(tenantKey)) {
+        tenantOrder.set(tenantKey, orderIndex++);
+      }
+    }
+
+    items.sort((a, b) => {
+      const tenantA = a.tenantName || a.tenantId;
+      const tenantB = b.tenantName || b.tenantId;
+      const orderA = tenantOrder.get(tenantA) ?? 0;
+      const orderB = tenantOrder.get(tenantB) ?? 0;
+      return orderA - orderB;
+    });
+
     return items;
   }
 );
 
-// Derived store for items grouped by tenant
+// Derived store for items grouped by tenant (group by tenantName for display, not tenantId)
 export const itemsByTenant = derived(filteredItems, ($items) => {
   const grouped = new Map<string, { tenantName: string; items: DisplayItem[] }>();
 
   for (const item of $items) {
-    const key = item.tenantId;
+    // Group by tenantName (domain) for display purposes
+    // tenantId may be a GUID (for navigation) which would create separate groups for same tenant
+    const key = item.tenantName || item.tenantId;
     if (!grouped.has(key)) {
       grouped.set(key, {
         tenantName: item.tenantName,
@@ -193,8 +219,26 @@ export const overlayActions = {
     if (item.type === 'bookmark') {
       await bookmarkStore.navigate(item.id);
     } else {
-      // Navigate to history item
-      window.location.href = item.url;
+      // Navigate to history item - check for directory switching
+      let navigationUrl = item.url;
+
+      // Check if we're navigating to a different directory
+      const currentDir = getCurrentDirectoryInfo();
+      const itemDomain = item.tenantName?.toLowerCase() || null;
+      const sameDirectory = isSameDirectory(currentDir.domain, itemDomain);
+
+      // Get tenant GUID - prefer stored tenantId, fallback to cached mapping
+      let tenantGuid = item.tenantId;
+      if (!tenantGuid && itemDomain) {
+        tenantGuid = await lookupTenantGuid(itemDomain);
+      }
+
+      if (!sameDirectory && tenantGuid) {
+        // Different directory - inject GUID into URL path for cross-tenant navigation
+        navigationUrl = buildNavigationUrl(item.url, tenantGuid);
+      }
+
+      window.location.href = navigationUrl;
     }
 
     this.close();

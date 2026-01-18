@@ -1,9 +1,36 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, generateDisplayName, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, isErrorPage } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
+
+// Cache for domain → GUID mapping (shared with bookmarks store via storage)
+type TenantMapping = Record<string, string>;
+
+async function getTenantMapping(): Promise<TenantMapping> {
+  const mapping = await storageGet('tenantMapping' as any);
+  return mapping || {};
+}
+
+async function saveTenantMapping(mapping: TenantMapping): Promise<void> {
+  await storageSet('tenantMapping' as any, mapping);
+}
+
+async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
+  if (!tenantGuid || !tenantDomain) return;
+  const mapping = await getTenantMapping();
+  if (mapping[tenantDomain] !== tenantGuid) {
+    mapping[tenantDomain] = tenantGuid;
+    await saveTenantMapping(mapping);
+  }
+}
+
+async function lookupTenantGuid(tenantDomain: string): Promise<string | null> {
+  if (!tenantDomain) return null;
+  const mapping = await getTenantMapping();
+  return mapping[tenantDomain] || null;
+}
 
 // Delay before extracting DOM name to allow page to render
 const DOM_EXTRACTION_DELAY_MS = 500;
@@ -56,37 +83,60 @@ export const historyStore = {
 
       // Check if history is enabled
       if (!settings.historyEnabled) {
-        console.log('[BetterPortal] History disabled, skipping capture');
         return null;
       }
 
       const parsed = parsePortalUrl(url);
-      console.log('[BetterPortal] Parsed URL:', { resourceId: parsed.resourceId, tenantId: parsed.tenantId });
 
       // Only track resource pages
       if (!parsed.resourceId) {
-        console.log('[BetterPortal] No resourceId found, skipping');
         return null;
       }
 
       const all = await this.getAll();
-      console.log('[BetterPortal] Current history count:', all.length);
 
-      // Check if entry already exists
+      // Determine tenant ID for navigation (MUST be GUID) and tenant name for grouping
+      // tenantId: Used for cross-tenant navigation - MUST be a GUID, null if unavailable
+      // tenantName: Used for grouping/display - should be the domain for consistent grouping
+      //
+      // IMPORTANT: Only trust GUID from URL path. Cache and MSAL tokens are unreliable
+      // because MSAL caches tokens for ALL tenants, not just the current one.
+
+      const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
+      const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      // Determine effective tenant ID for navigation - MUST be a GUID or null
+      let effectiveTenantId: string | null = null;
+
+      if (parsed.tenantId && guidRegex.test(parsed.tenantId)) {
+        // URL has GUID in path - this is the ONLY reliable source
+        effectiveTenantId = parsed.tenantId;
+        // Cache this mapping since it came from URL (reliable)
+        if (parsed.tenantDomain) {
+          await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+        }
+      }
+
+      // If we have a GUID tenant ID, ensure URL has it in path for reliable navigation
+      let finalUrl = url;
+      if (effectiveTenantId && !finalUrl.includes(effectiveTenantId)) {
+        finalUrl = buildNavigationUrl(finalUrl, effectiveTenantId);
+      }
+
+      // Check if entry already exists (use tenantName for grouping consistency)
       const existingIndex = all.findIndex(
-        (h) => h.resourceId === parsed.resourceId && h.tenantId === parsed.tenantId
+        (h) => h.resourceId === parsed.resourceId && h.tenantName === effectiveTenantName
       );
 
       if (existingIndex >= 0) {
         // Update existing entry
         all[existingIndex] = {
           ...all[existingIndex],
-          url,
+          url: finalUrl,
           visitedAt: Date.now(),
           visitCount: all[existingIndex].visitCount + 1,
         };
         await storageSet('history', all);
-        console.log('[BetterPortal] Updated existing history entry');
         return all[existingIndex];
       }
 
@@ -97,14 +147,25 @@ export const historyStore = {
       // Wait for DOM to update before extracting name
       await new Promise(resolve => setTimeout(resolve, DOM_EXTRACTION_DELAY_MS));
 
+      // Check if the page is showing an error state (e.g., wrong directory, token issuer mismatch)
+      // This happens when switching directories and the portal tries to load the same resource
+      if (isErrorPage()) {
+        return null;
+      }
+
       // Try to get DOM name for additional context
       const domName = getResourceNameFromDOM();
 
+      // Check if URL resource name looks like a GUID (subscriptions use GUIDs, not friendly names)
+      const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlResourceName);
+
       // Use URL-extracted display name as primary (always correct, includes hierarchy)
-      // Only use DOM name if it matches the current resource
+      // Prefer DOM name when:
+      // 1. URL resource name is a GUID (e.g., subscription) - DOM has the friendly name
+      // 2. DOM name contains the URL resource name - they match
       let displayName: string;
-      if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
-        // DOM name contains the resource name - use it but keep the sub-path from URL
+      if (domName && (isGuid || domName.toLowerCase().includes(urlResourceName.toLowerCase()))) {
+        // DOM name is valid - use it but keep the sub-path from URL if any
         const urlParts = urlDisplayName.split(' | ');
         if (urlParts.length > 1) {
           // Replace the resource name part with DOM name, keep the rest
@@ -112,19 +173,17 @@ export const historyStore = {
         } else {
           displayName = domName;
         }
-        console.log('[BetterPortal] Using DOM name with path:', displayName);
       } else {
         // DOM name doesn't match - use URL-extracted display name
         displayName = urlDisplayName;
-        console.log('[BetterPortal] Using URL display name:', urlDisplayName, '(DOM was:', domName, ')');
       }
 
-      // Create new entry
+      // Create new entry (use effectiveTenantId for navigation, effectiveTenantName for grouping)
       const entry: HistoryEntry = {
         id: crypto.randomUUID(),
-        url,
-        tenantId: parsed.tenantId || 'unknown',
-        tenantName: getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant',
+        url: finalUrl,
+        tenantId: effectiveTenantId,
+        tenantName: effectiveTenantName,
         resourceId: parsed.resourceId,
         displayName,
         visitedAt: Date.now(),
@@ -137,7 +196,6 @@ export const historyStore = {
       const pruned = await this.prune(all, settings);
 
       await storageSet('history', pruned);
-      console.log('[BetterPortal] Added new history entry:', displayName, '(total:', pruned.length, ')');
       return entry;
     } catch (error) {
       console.error('[BetterPortal] Error in history upsert:', error);

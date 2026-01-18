@@ -5,8 +5,8 @@ export const PORTAL_URL_PATTERNS = {
   // Match tenant ID in URL path: portal.azure.com/{guid}/
   TENANT_ID: /portal\.azure\.com\/([a-f0-9-]{36})/i,
 
-  // Match tenant domain in hash: #@contoso.com/
-  TENANT_DOMAIN: /#@([^/]+)\//,
+  // Match tenant domain in hash: #@contoso.com/ or #@contoso.com (without trailing slash)
+  TENANT_DOMAIN: /#@([^/#]+)/,
 
   // Match resource ID: /resource/subscriptions/.../providers/.../resourceName
   RESOURCE_ID: /\/resource\/([^?#]+)/,

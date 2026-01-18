@@ -25,12 +25,18 @@
   });
 
   function openSettings() {
-    // Send message to content script to open settings
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
+      const currentUrl = tabs[0]?.url || '';
+      const isOnPortal = currentUrl.includes('portal.azure.com');
+
+      if (isOnPortal && tabs[0]?.id) {
+        // On portal: open settings as overlay
         chrome.tabs.sendMessage(tabs[0].id, { type: 'OPEN_SETTINGS' });
-        window.close();
+      } else {
+        // Not on portal: open standalone settings page
+        chrome.tabs.create({ url: chrome.runtime.getURL('src/settings/index.html') });
       }
+      window.close();
     });
   }
 

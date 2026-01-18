@@ -1,17 +1,55 @@
 // Bookmarks store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
-import type { Bookmark, Settings } from '../../shared/types';
+import type { Bookmark } from '../../shared/types';
 import {
   parsePortalUrl,
-  generateDisplayName,
   getTenantNameFromDOM,
   getResourceNameFromDOM,
   extractResourceName,
   extractDisplayName,
-  isSubscriptionResource,
   stripBlade,
+  buildNavigationUrl,
+  getCurrentDirectoryInfo,
+  isSameDirectory,
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
+
+// Cache for domain → GUID mapping (learned from URLs)
+// This persists so we can look up GUIDs for domains we've seen before
+type TenantMapping = Record<string, string>; // domain -> GUID
+
+async function getTenantMapping(): Promise<TenantMapping> {
+  const mapping = await storageGet('tenantMapping' as any);
+  return mapping || {};
+}
+
+async function saveTenantMapping(mapping: TenantMapping): Promise<void> {
+  await storageSet('tenantMapping' as any, mapping);
+}
+
+/**
+ * Learn and cache the domain → GUID mapping from a URL
+ * When URL has both GUID in path and domain in hash, we can learn the mapping
+ */
+async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
+  if (!tenantGuid || !tenantDomain) return;
+
+  const mapping = await getTenantMapping();
+  if (mapping[tenantDomain] !== tenantGuid) {
+    mapping[tenantDomain] = tenantGuid;
+    await saveTenantMapping(mapping);
+  }
+}
+
+/**
+ * Look up a GUID for a domain from the cache
+ */
+export async function lookupTenantGuid(tenantDomain: string): Promise<string | null> {
+  if (!tenantDomain) return null;
+
+  const mapping = await getTenantMapping();
+  return mapping[tenantDomain] || null;
+}
 
 export const bookmarkStore = {
   /**
@@ -74,7 +112,7 @@ export const bookmarkStore = {
 
     // Determine final URL based on state depth
     const stateDepth = options?.stateDepth || settings.defaultStateDepth;
-    const finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
+    let finalUrl = stateDepth === 'resource' ? stripBlade(url) : url;
 
     // Get display name from URL (resource name + sub-path)
     const urlDisplayName = parsed.resourceId ? extractDisplayName(parsed.resourceId) : 'Unknown';
@@ -83,11 +121,16 @@ export const bookmarkStore = {
     // Get DOM name for potential friendly formatting
     const domName = getResourceNameFromDOM();
 
+    // Check if URL resource name looks like a GUID (subscriptions use GUIDs, not friendly names)
+    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlResourceName);
+
     // Use URL-extracted display name as primary (always correct, includes hierarchy)
-    // Only use DOM name if it matches the current resource
+    // Prefer DOM name when:
+    // 1. URL resource name is a GUID (e.g., subscription) - DOM has the friendly name
+    // 2. DOM name contains the URL resource name - they match
     let displayName: string;
-    if (domName && domName.toLowerCase().includes(urlResourceName.toLowerCase())) {
-      // DOM name contains the resource name - use it but keep the sub-path from URL
+    if (domName && (isGuid || domName.toLowerCase().includes(urlResourceName.toLowerCase()))) {
+      // DOM name is valid - use it but keep the sub-path from URL if any
       const urlParts = urlDisplayName.split(' | ');
       if (urlParts.length > 1) {
         // Replace the resource name part with DOM name, keep the rest
@@ -95,17 +138,65 @@ export const bookmarkStore = {
       } else {
         displayName = domName;
       }
-      console.log('[BetterPortal] Bookmark using DOM name with path:', displayName);
+      console.log('[BetterPortal] Bookmark using DOM name:', displayName, isGuid ? '(URL was GUID)' : '(matched URL)');
     } else {
       displayName = urlDisplayName;
       console.log('[BetterPortal] Bookmark using URL display name:', urlDisplayName, '(DOM was:', domName, ')');
     }
 
+    // Determine tenant ID for navigation (MUST be GUID) and tenant name for grouping
+    // tenantId: Used for cross-tenant navigation - MUST be a GUID, null if unavailable
+    // tenantName: Used for grouping/display - should be the domain for consistent grouping
+    //
+    // Strategy for finding tenant GUID (in order of reliability):
+    // 1. URL path GUID (parsed.tenantId) - most reliable, directly from current URL
+    // 2. Cached mapping lookup (if we learned it before from a URL with GUID)
+    // 3. getTenantGuidFromPortal() - may return wrong tenant from MSAL cache, but better than nothing
+    // 4. null - if no GUID found, don't store domain as tenantId
+
+    const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // Determine effective tenant ID for navigation - MUST be a GUID or null
+    // IMPORTANT: Only trust GUID from URL path. Cache and MSAL tokens are unreliable
+    // because MSAL caches tokens for ALL tenants, not just the current one.
+    let effectiveTenantId: string | null = null;
+
+    if (parsed.tenantId && guidRegex.test(parsed.tenantId)) {
+      // URL has GUID in path - this is the ONLY reliable source
+      effectiveTenantId = parsed.tenantId;
+
+      // Cache this mapping since it came from URL (reliable)
+      if (parsed.tenantDomain) {
+        await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+      }
+      console.log('[BetterPortal] Using GUID from URL path (reliable):', effectiveTenantId);
+    } else {
+      // URL does not have GUID in path - cross-tenant navigation won't work reliably
+      // We could try cache/MSAL, but they're often wrong after directory switches
+      // Better to leave tenantId as null and keep the original #@domain URL format
+      console.log('[BetterPortal] No GUID in URL path - keeping original URL format');
+      console.log('[BetterPortal] Cross-tenant navigation requires GUID in URL. Please navigate to the resource first, then save.');
+    }
+
+    // If we have a GUID tenant ID, ensure the URL has it in the path for reliable navigation
+    if (effectiveTenantId && !finalUrl.includes(effectiveTenantId)) {
+      finalUrl = buildNavigationUrl(finalUrl, effectiveTenantId);
+      console.log('[BetterPortal] Updated URL with tenant GUID:', finalUrl);
+    }
+
+    console.log('[BetterPortal] Bookmark tenant detection:', {
+      urlTenantId: parsed.tenantId,
+      urlDomain: parsed.tenantDomain,
+      effectiveId: effectiveTenantId,
+      effectiveName: effectiveTenantName
+    });
+
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),
       url: finalUrl,
-      tenantId: parsed.tenantId || 'unknown',
-      tenantName: getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant',
+      tenantId: effectiveTenantId,
+      tenantName: effectiveTenantName,
       resourceId: parsed.resourceId || '',
       displayName,
       alias: options?.alias || null,
@@ -116,10 +207,10 @@ export const bookmarkStore = {
       isStale: false,
     };
 
-    // Check for existing bookmark with same resource+tenant
+    // Check for existing bookmark with same resource+tenant (use tenantName for grouping consistency)
     const all = await this.getAll();
     const existingIndex = all.findIndex(
-      (b) => b.resourceId === bookmark.resourceId && b.tenantId === bookmark.tenantId
+      (b) => b.resourceId === bookmark.resourceId && b.tenantName === bookmark.tenantName
     );
 
     if (existingIndex >= 0) {
@@ -204,8 +295,27 @@ export const bookmarkStore = {
       accessCount: bookmark.accessCount + 1,
     });
 
+    // Determine the navigation URL
+    let navigationUrl = bookmark.url;
+
+    // Check if we're navigating to a different directory
+    const currentDir = getCurrentDirectoryInfo();
+    const bookmarkDomain = bookmark.tenantName?.toLowerCase() || null;
+    const sameDirectory = isSameDirectory(currentDir.domain, bookmarkDomain);
+
+    // Get tenant GUID - prefer stored tenantId, fallback to cached mapping
+    let tenantGuid = bookmark.tenantId;
+    if (!tenantGuid && bookmarkDomain) {
+      tenantGuid = await lookupTenantGuid(bookmarkDomain);
+    }
+
+    if (!sameDirectory && tenantGuid) {
+      // Different directory - inject GUID into URL path for cross-tenant navigation
+      navigationUrl = buildNavigationUrl(bookmark.url, tenantGuid);
+    }
+
     // Navigate
-    window.location.href = bookmark.url;
+    window.location.href = navigationUrl;
   },
 
   /**

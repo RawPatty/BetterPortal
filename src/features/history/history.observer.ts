@@ -8,8 +8,12 @@ let pollInterval: number | null = null;
 let lastUrl: string = '';
 let isInitialized = false;
 
+// Store bound event handlers for cleanup
+let popstateHandler: (() => void) | null = null;
+let hashchangeHandler: (() => void) | null = null;
+
 // Poll interval for URL changes (Azure portal doesn't always trigger standard events)
-const URL_POLL_INTERVAL_MS = 1000;
+const URL_POLL_INTERVAL_MS = 2000; // Increased from 1000ms to reduce CPU usage
 
 /**
  * Initialize history observer
@@ -40,14 +44,12 @@ export function initHistoryObserver(): void {
   };
 
   // Listen for popstate (back/forward navigation)
-  window.addEventListener('popstate', () => {
-    handleNavigation('popstate');
-  });
+  popstateHandler = () => handleNavigation('popstate');
+  window.addEventListener('popstate', popstateHandler);
 
   // Listen for hashchange (Azure portal uses hash-based routing)
-  window.addEventListener('hashchange', () => {
-    handleNavigation('hashchange');
-  });
+  hashchangeHandler = () => handleNavigation('hashchange');
+  window.addEventListener('hashchange', hashchangeHandler);
 
   // Poll for URL changes as fallback (Azure portal may not trigger standard events)
   pollInterval = window.setInterval(() => {
@@ -68,15 +70,12 @@ export function initHistoryObserver(): void {
  */
 function handleNavigation(source: string): void {
   const currentUrl = window.location.href;
-  console.log('[BetterPortal] Navigation event:', source, 'URL:', currentUrl.substring(0, 80));
 
   // Skip if URL hasn't changed
   if (currentUrl === lastUrl) {
-    console.log('[BetterPortal] URL unchanged, skipping');
     return;
   }
 
-  console.log('[BetterPortal] URL changed from:', lastUrl.substring(0, 80));
   lastUrl = currentUrl;
 
   // Clear existing timer
@@ -86,7 +85,6 @@ function handleNavigation(source: string): void {
 
   // Debounce to avoid capturing rapid navigations
   debounceTimer = window.setTimeout(() => {
-    console.log('[BetterPortal] Debounce complete, capturing page');
     captureCurrentPage();
     debounceTimer = null;
   }, HISTORY_DEBOUNCE_MS);
@@ -129,6 +127,15 @@ export function stopHistoryObserver(): void {
   if (pollInterval !== null) {
     window.clearInterval(pollInterval);
     pollInterval = null;
+  }
+  // Remove event listeners
+  if (popstateHandler) {
+    window.removeEventListener('popstate', popstateHandler);
+    popstateHandler = null;
+  }
+  if (hashchangeHandler) {
+    window.removeEventListener('hashchange', hashchangeHandler);
+    hashchangeHandler = null;
   }
   isInitialized = false;
 }

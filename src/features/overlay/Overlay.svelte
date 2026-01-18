@@ -77,18 +77,12 @@
     const currentSettings = $settings;
     const hotkey = currentSettings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false };
 
-    // Debug: log Ctrl key combinations
-    if (event.ctrlKey) {
-      console.log('[BetterPortal] Keydown:', { pressedKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, expected: hotkey });
-    }
-
     if (
       pressedKey === hotkey.key &&
       event.ctrlKey === hotkey.ctrl &&
       event.shiftKey === hotkey.shift &&
       event.altKey === hotkey.alt
     ) {
-      console.log('[BetterPortal] Hotkey matched! Toggling overlay');
       event.preventDefault();
       event.stopPropagation();
       overlayActions.toggle();
@@ -283,15 +277,18 @@
           </div>
         {:else}
           {#each [...$itemsByTenant] as [tenantId, group], groupIndex}
-            <div class="bp-group">
+            <div class="bp-group" class:bp-group--first={groupIndex === 0}>
               <div class="bp-group-header">
-                <span class="bp-tenant-name">{group.tenantName}</span>
-                <span class="bp-tenant-count">{group.items.length}</span>
+                <div class="bp-group-header-left">
+                  <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <span class="bp-tenant-name">{group.tenantName}</span>
+                </div>
+                <span class="bp-tenant-count">{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span>
               </div>
               {#each group.items as item, itemIndex}
-                {@const flatIndex = [...$itemsByTenant]
-                  .slice(0, groupIndex)
-                  .reduce((acc, [, g]) => acc + g.items.length, 0) + itemIndex}
+                {@const flatIndex = flatItems.findIndex(fi => fi.id === item.id)}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <!-- svelte-ignore a11y-no-static-element-interactions -->
                 <div
@@ -332,7 +329,8 @@
 
       <footer class="bp-footer">
         <div class="bp-shortcuts">
-          <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> or <kbd>j</kbd><kbd>k</kbd> navigate</span>
+          <span><kbd>Enter</kbd> open</span>
           <span><kbd>/</kbd> search</span>
           <span><kbd>a</kbd> add</span>
           <span><kbd>d</kbd> delete</span>
@@ -450,26 +448,48 @@
   }
 
   .bp-group {
-    margin-bottom: 8px;
+    margin-bottom: 0;
+    border-top: 2px solid var(--bp-border, #e1e1e1);
+    padding-top: 4px;
+  }
+
+  .bp-group--first {
+    border-top: none;
+    padding-top: 0;
   }
 
   .bp-group-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px 4px;
-    font-size: 11px;
+    padding: 10px 16px 6px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--bp-text-secondary, #666);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--bp-text, #323130);
+    background: var(--bp-bg-tertiary, rgba(0, 120, 212, 0.06));
+    border-bottom: 1px solid var(--bp-border, #e1e1e1);
+    margin-bottom: 4px;
+  }
+
+  .bp-group-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bp-directory-icon {
+    color: var(--bp-accent, #0078d4);
+    flex-shrink: 0;
+  }
+
+  .bp-tenant-name {
+    font-weight: 600;
   }
 
   .bp-tenant-count {
-    font-size: 10px;
-    background: var(--bp-bg-secondary, #f5f5f5);
-    padding: 2px 6px;
-    border-radius: 10px;
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+    font-weight: 400;
   }
 
   .bp-item {
@@ -559,6 +579,7 @@
   .bp-theme-portal {
     --bp-bg: #ffffff;
     --bp-bg-secondary: #f3f2f1;
+    --bp-bg-tertiary: rgba(0, 120, 212, 0.06);
     --bp-text: #323130;
     --bp-text-secondary: #605e5c;
     --bp-border: #e1dfdd;
@@ -573,6 +594,7 @@
   .bp-theme-dark {
     --bp-bg: #1e1e1e;
     --bp-bg-secondary: #2d2d2d;
+    --bp-bg-tertiary: rgba(79, 195, 247, 0.1);
     --bp-text: #ffffff;
     --bp-text-secondary: #a0a0a0;
     --bp-border: #3d3d3d;
@@ -587,6 +609,7 @@
   .bp-theme-light {
     --bp-bg: #ffffff;
     --bp-bg-secondary: #fafafa;
+    --bp-bg-tertiary: rgba(25, 118, 210, 0.06);
     --bp-text: #212121;
     --bp-text-secondary: #757575;
     --bp-border: #e0e0e0;
