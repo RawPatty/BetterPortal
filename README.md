@@ -9,7 +9,6 @@ Fast Azure portal navigation with bookmarks, and history.
 - **Quick Access Overlay**: Press `Ctrl+Space` to open a command palette-style overlay
 - **Bookmarks**: Save Azure resources with one-click navigation
 - **History**: Auto-capture visited resources with promotion to bookmarks
-- **Diff**: Snapshot resource state and compare before/after changes
 - **Vim-style Navigation**: `j`/`k` to navigate, `Enter` to select, `/` to search
 - **Multi-tenant Support**: Automatic directory switching when navigating
 
