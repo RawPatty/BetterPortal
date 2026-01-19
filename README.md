@@ -51,8 +51,6 @@ npm test
 | `Esc` | Close overlay |
 | `a` | Add current page as bookmark |
 | `d` | Delete selected bookmark |
-| `s` | Capture snapshot (on resource page) |
-| `d` | Show diff (when snapshots exist) |
 | `?` | Open settings |
 
 ### Bookmarks
@@ -66,18 +64,6 @@ npm test
 - Automatically captures visited Azure resources
 - Promote history items to bookmarks with `a` key
 - Configurable retention period (default: 30 days)
-
-### Diff Feature
-
-1. Navigate to a resource you want to track
-2. Press `s` to capture a "before" snapshot
-3. Make your infrastructure changes
-4. Press `s` again for an "after" snapshot
-5. Press `d` to view the diff
-
-The diff shows:
-- Property changes (added, removed, modified)
-- IAM role assignment changes
 
 ## Tech Stack
 
@@ -97,7 +83,7 @@ src/
 │   ├── overlay/         # Main overlay UI
 │   ├── bookmarks/       # Bookmark management
 │   ├── history/         # History tracking
-│   ├── diff/            # Snapshot & diff
+│   ├── diff/            # Snapshot & diff (coming soon)
 │   └── settings/        # Settings management
 ├── popup/               # Extension popup
 ├── shared/              # Shared types, storage, constants
@@ -115,7 +101,6 @@ Configurable options:
 - Theme (Light, Dark)
 - History enable/disable
 - History retention period
-- Diff ignored paths
 
 ## Development
 
@@ -170,11 +155,11 @@ Contributions are welcome! Here's how you can help:
 ### Current (v1.x)
 - ✅ Local bookmarks and history
 - ✅ Multi-tenant support
-- ✅ Resource diffing
 - ✅ Customizable hotkeys
 - ✅ Dark/Light themes
 
 ### Planned
+- 🔄 Resource diffing and snapshots
 - 🔄 Cloud sync for bookmarks (paid feature)
 - 🔄 Team collaboration features
 - 🔄 Advanced filtering and tagging
