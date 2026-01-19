@@ -1,0 +1,22 @@
+=== CHROME WEB STORE PERMISSION JUSTIFICATIONS ===
+Copy-paste these into the Chrome Web Store submission form fields.
+
+---
+STORAGE PERMISSION:
+---
+Store user bookmarks, navigation history, and settings locally on the user's device using chrome.storage.local. All data stays on the user's computer - nothing is sent to external servers. Users can export/import their data as JSON files. No telemetry or tracking.
+
+---
+ACTIVETAB PERMISSION:
+---
+Read the current tab's URL when the user presses the bookmark hotkey (default: Ctrl+Space) to save the Azure Portal resource they're viewing. Only accesses URL on explicit user action. Does not track browsing outside portal.azure.com.
+
+---
+HOST PERMISSION (portal.azure.com):
+---
+Inject overlay UI for bookmark navigation (Ctrl+Space), track navigation within Azure Portal's single-page app for history feature, and extract user-friendly resource names from the DOM (Portal URLs contain GUIDs, not readable names). Only works on portal.azure.com. Does not modify portal functionality or access sensitive data.
+
+---
+REMOTE CODE:
+---
+NOT USED. All JavaScript is bundled into the extension package at build time. No external scripts, no eval(), no CDN imports. Dependencies (fuzzysort, deep-diff) are bundled locally. External URLs in About modal are documentation links only (a href tags), not code execution. Open source: https://github.com/RawPatty/BetterPortal
