@@ -8,7 +8,8 @@ Fast Azure portal navigation with bookmarks, and history.
 
 - **Quick Access Overlay**: Press `Ctrl+Space` to open a command palette-style overlay
 - **Bookmarks**: Save Azure resources with one-click navigation
-- **History**: Auto-capture visited resources with promotion to bookmarks
+- **History**: Auto-capture visited resources
+- **Import/Export**: Backup and restore bookmarks as JSON
 - **Vim-style Navigation**: `j`/`k` to navigate, `Enter` to select, `/` to search
 - **Multi-tenant Support**: Automatic directory switching when navigating
 
@@ -62,8 +63,15 @@ npm test
 ### History
 
 - Automatically captures visited Azure resources
-- Promote history items to bookmarks with `a` key
+- Navigate to any resource and press `a` to bookmark it
 - Configurable retention period (default: 30 days)
+
+### Import/Export
+
+- Click the extension icon to access import/export
+- **Export Data**: Download all bookmarks as JSON
+- **Import Data**: Upload previously exported bookmarks
+- Useful for backup, migration, or sharing bookmarks
 
 ## Tech Stack
 
@@ -157,13 +165,14 @@ Contributions are welcome! Here's how you can help:
 - ✅ Multi-tenant support
 - ✅ Customizable hotkeys
 - ✅ Dark/Light themes
+- ✅ Export/import bookmarks
 
 ### Planned
 - 🔄 Resource diffing and snapshots
+- 🔄 Direct promotion of selected history items to bookmarks
 - 🔄 Cloud sync for bookmarks (paid feature)
 - 🔄 Team collaboration features
 - 🔄 Advanced filtering and tagging
-- 🔄 Export/import enhancements
 - 🔄 Browser sync (Firefox, Edge)
 
 **Note:** The core extension will remain free and open source. Cloud sync and team features will be offered as optional paid services to support development.
