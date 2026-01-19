@@ -2,6 +2,8 @@
 
 Fast Azure portal navigation with bookmarks, history, and resource diffing.
 
+> **Open Source** | Privacy-focused | All data stored locally
+
 ## Features
 
 - **Quick Access Overlay**: Press `Ctrl+Space` to open a command palette-style overlay
@@ -141,6 +143,54 @@ npm run build
 
 Output is in `dist/` folder, ready for Chrome extension loading.
 
+## Contributing
+
+Contributions are welcome! Here's how you can help:
+
+### Reporting Issues
+- Use GitHub Issues to report bugs or request features
+- Include steps to reproduce, expected vs actual behavior
+- Screenshots are helpful for UI issues
+
+### Pull Requests
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Write tests for your changes (see `CLAUDE.md` for testing guidelines)
+4. Ensure tests pass (`npm test`)
+5. Commit with clear messages
+6. Push to your fork and submit a PR
+
+### Development Guidelines
+- See `CLAUDE.md` for architecture patterns and learnings
+- Follow existing code style (TypeScript + Svelte)
+- Add tests for bug fixes and new features
+- Keep commits focused and atomic
+
+## Roadmap
+
+### Current (v1.x)
+- ✅ Local bookmarks and history
+- ✅ Multi-tenant support
+- ✅ Resource diffing
+- ✅ Customizable hotkeys
+- ✅ Dark/Light themes
+
+### Planned
+- 🔄 Cloud sync for bookmarks (paid feature)
+- 🔄 Team collaboration features
+- 🔄 Advanced filtering and tagging
+- 🔄 Export/import enhancements
+- 🔄 Browser sync (Firefox, Edge)
+
+**Note:** The core extension will remain free and open source. Cloud sync and team features will be offered as optional paid services to support development.
+
+## Privacy
+
+- **No telemetry or analytics** - we don't track you
+- **No external servers** - all data stored locally in Chrome storage
+- **No data collection** - bookmarks and settings stay on your machine
+- **Open source** - audit the code yourself
+
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) file for details

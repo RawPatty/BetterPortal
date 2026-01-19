@@ -3,6 +3,24 @@
   "version": "1.0.59",
   "description": "Fast Azure portal navigation with bookmarks, history, and resource diffing",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RawPatty/BetterPortal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RawPatty/BetterPortal/issues"
+  },
+  "homepage": "https://github.com/RawPatty/BetterPortal#readme",
+  "author": "BetterPortal Contributors",
+  "keywords": [
+    "azure",
+    "portal",
+    "chrome-extension",
+    "bookmarks",
+    "productivity",
+    "navigation"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
