@@ -1,7 +1,15 @@
 // ARM Client for Azure Resource Manager API calls
-import { getToken } from './token-extractor';
 import { ARM_API } from '../../shared/constants';
 import type { RoleAssignment } from '../../shared/types';
+
+/**
+ * Get authentication token
+ * NOTE: Token extraction feature removed for v1.0 to simplify Chrome Web Store privacy disclosure
+ * Will be re-implemented in future version when diff feature is enabled
+ */
+async function getToken(): Promise<string | null> {
+  return null;
+}
 
 interface ArmResponse<T = any> {
   success: boolean;

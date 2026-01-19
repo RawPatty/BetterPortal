@@ -184,6 +184,8 @@ Contributions are welcome! Here's how you can help:
 - **No data collection** - bookmarks and settings stay on your machine
 - **Open source** - audit the code yourself
 
+**Full Privacy Policy:** [PRIVACY.md](PRIVACY.md)
+
 ## License
 
 MIT - See [LICENSE](LICENSE) file for details

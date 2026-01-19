@@ -112,10 +112,6 @@ export interface StorageSchema {
   settings_version: number;
   snapshots: Snapshot[];
   snapshots_version: number;
-  cached_token: {
-    token: string;
-    capturedAt: number;
-  } | null;
 }
 
 // ============ URL Parsing ============

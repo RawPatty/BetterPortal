@@ -29,10 +29,6 @@ The extension stores user data locally on their device using Chrome's storage AP
   - Stored in `chrome.storage.local` as JSON
   - Location: `src/features/settings/settings.store.ts`
 
-- **Cached authentication tokens**: Temporary storage of Azure Portal session tokens
-  - Used only for snapshot/diff feature (currently not active in UI)
-  - Tokens are extracted from user's existing portal session
-  - Location: `src/features/diff/token-extractor.ts`
 
 **Data Privacy:**
 - All data is stored locally on the user's device

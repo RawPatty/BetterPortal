@@ -1,0 +1,83 @@
+=== CHROME WEB STORE DATA USAGE DISCLOSURE ===
+Copy-paste this into the Chrome Web Store data usage form.
+
+---
+WHAT DATA IS COLLECTED?
+---
+
+BetterPortal collects the following data, ALL stored locally on your device:
+
+1. WEB HISTORY (portal.azure.com only):
+   - URLs of Azure resources you visit
+   - Resource names and visit timestamps
+   - Used for navigation history feature
+   - Can be disabled in settings
+   - Stored locally, NEVER transmitted externally
+
+2. WEBSITE CONTENT (portal.azure.com only):
+   - Resource names and tenant names from Azure Portal DOM
+   - Used to provide friendly names (URLs contain GUIDs)
+   - Read-only access
+   - Stored locally, NEVER transmitted externally
+
+ALL DATA IS STORED LOCALLY ON YOUR DEVICE.
+NO DATA IS SENT TO EXTERNAL SERVERS.
+No telemetry, no analytics, no tracking.
+
+Privacy Policy: https://github.com/RawPatty/BetterPortal/blob/trunk/PRIVACY.md
+Open Source: https://github.com/RawPatty/BetterPortal
+
+---
+CERTIFICATION FOR CHROME WEB STORE:
+---
+
+☑ Web history - YES (portal.azure.com navigation only)
+☑ Website content - YES (DOM-extracted resource names only)
+
+☐ Personally identifiable information - NO
+☐ Health information - NO
+☐ Financial and payment information - NO
+☐ Authentication information - NO
+☐ Personal communications - NO
+☐ Location - NO
+☐ User activity (clicks/keystrokes) - NO
+
+---
+HOW IS DATA USED?
+---
+
+All data is used exclusively for extension functionality:
+- Display bookmarks with human-readable names
+- Show recently visited resources
+- Enable quick navigation
+- Remember your preferences
+
+Data is NEVER:
+- Transmitted to external servers
+- Shared with third parties
+- Used for advertising
+- Used for analytics or tracking
+- Sold or monetized
+
+---
+HOW IS DATA HANDLED?
+---
+
+- Collected: Locally on user device (chrome.storage.local)
+- Encrypted: Chrome storage API handles encryption
+- Retention: User configurable (default 30 days for history)
+- Deletion: User can delete data anytime or uninstall extension
+
+---
+USER CONTROL:
+---
+
+Users have complete control:
+- Export all data (JSON file)
+- Delete individual items
+- Clear all data (Settings → Reset)
+- Disable history tracking
+- Adjust retention period
+- Uninstall removes all data
+
+All data stays on the user's device. Period.

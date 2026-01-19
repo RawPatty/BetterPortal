@@ -5,7 +5,6 @@ console.log('[BetterPortal] Content script file loaded');
 
 import { mountOverlay } from './mount';
 import { initHistoryObserver } from '../features/history/history.observer';
-import { initTokenExtractor } from '../features/diff/token-extractor';
 
 let overlayMounted = false;
 let messageListenerAdded = false;
@@ -35,9 +34,6 @@ function onReady() {
     // Start history observer immediately
     console.log('[BetterPortal] Starting history observer');
     initHistoryObserver();
-
-    // Start token extractor for ARM API calls
-    initTokenExtractor();
 
     // Listen for messages from background/popup (only add once)
     if (!messageListenerAdded) {
