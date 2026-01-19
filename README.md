@@ -1,6 +1,6 @@
 # BetterPortal
 
-Fast Azure portal navigation with bookmarks, history, and resource diffing.
+Fast Azure portal navigation with bookmarks, and history.
 
 > **Open Source** | Privacy-focused | All data stored locally
 
