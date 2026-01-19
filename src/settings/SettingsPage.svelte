@@ -96,9 +96,10 @@
       <section class="bp-settings-section">
         <h3>Keyboard Shortcut</h3>
         <div class="bp-settings-row">
-          <label>Open Overlay</label>
+          <span class="bp-label">Open Overlay</span>
           <div class="bp-hotkey-input">
             {#if isRecordingHotkey}
+              <!-- svelte-ignore a11y-autofocus -->
               <input
                 type="text"
                 class="bp-hotkey-recorder"
@@ -294,7 +295,8 @@
     gap: 12px;
   }
 
-  .bp-settings-row label {
+  .bp-settings-row label,
+  .bp-settings-row .bp-label {
     font-size: 14px;
     color: var(--bp-text, #323130);
     display: flex;

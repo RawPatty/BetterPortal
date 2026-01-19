@@ -1,5 +1,6 @@
 // Chrome storage wrapper with typed access and migration support
 import type { StorageSchema } from './types';
+import { DEFAULT_SETTINGS } from './types';
 
 type StorageKey = keyof StorageSchema;
 
@@ -185,7 +186,6 @@ async function migrateSchema(
       case 'settings':
         const settings = await storageGet('settings');
         if (!settings) {
-          const { DEFAULT_SETTINGS } = await import('./types');
           await storageSet('settings', DEFAULT_SETTINGS);
         }
         break;
@@ -272,7 +272,6 @@ export async function importData(json: string): Promise<{
 
   // Optionally import settings
   if (data.settings) {
-    const { DEFAULT_SETTINGS } = await import('./types');
     await storageSet('settings', { ...DEFAULT_SETTINGS, ...data.settings });
     result.settingsImported = true;
   }

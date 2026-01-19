@@ -3,6 +3,7 @@ import { writable, derived, get } from 'svelte/store';
 import type { Bookmark, HistoryEntry, OverlayMode, Settings } from '../../shared/types';
 import { bookmarkStore, lookupTenantGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
+import { historyStore } from '../history/history.store';
 import {
   getCurrentDirectoryInfo,
   isSameDirectory,
@@ -169,7 +170,6 @@ export const overlayActions = {
 
       // Also refresh history if available (use settings for limit)
       try {
-        const { historyStore } = await import('../history/history.store');
         const limit = settingsData.historyMaxEntries || 500;
         const historyData = await historyStore.getRecent(limit);
         console.log('[BetterPortal] Loaded', historyData.length, 'history items (limit:', limit, ')');
@@ -258,8 +258,6 @@ export const overlayActions = {
     }
 
     console.log('[BetterPortal] Deleting item:', item.type, item.displayName);
-
-    const { historyStore } = await import('../history/history.store');
 
     if (item.type === 'bookmark') {
       // Delete bookmark AND corresponding history entry (so it doesn't reappear as history)
