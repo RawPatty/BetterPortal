@@ -936,11 +936,12 @@ export function normalizePortalUrl(url: string): string {
  * Build a navigation URL with tenant context for cross-tenant navigation
  *
  * Correct format for cross-tenant navigation:
- * https://portal.azure.com/{tenantGUID}/#@{domain}/resource/{resourcePath}
+ * https://portal.azure.com/{tenantGUID}/?queryParams#@{domain}/resource/{resourcePath}
  *
  * The GUID in the path authenticates you to the directory.
+ * Query parameters (like ?l=en.en-us) are preserved for language/feature settings.
  * The #@domain/resource/... navigates to the actual resource.
- * BOTH are needed for cross-tenant navigation to work properly.
+ * ALL parts are needed for reliable cross-tenant navigation.
  *
  * @param url - The original bookmark/history URL
  * @param tenantId - The tenant identifier (GUID preferred, domain fallback)
@@ -959,20 +960,32 @@ export function buildNavigationUrl(url: string, tenantId: string): string {
       return url; // Already correct
     }
 
-    // Extract the hash part (everything from # onwards)
+    // Parse URL to extract query parameters and hash
+    // URL format: https://portal.azure.com/oldGUID/?params#hash
     const hashIndex = url.indexOf('#');
+    const queryIndex = url.indexOf('?');
+
+    let queryPart = '';
     let hashPart = '';
+
     if (hashIndex !== -1) {
       hashPart = url.substring(hashIndex);
+      // Check if there's a query string before the hash
+      if (queryIndex !== -1 && queryIndex < hashIndex) {
+        queryPart = url.substring(queryIndex, hashIndex);
+      }
+    } else if (queryIndex !== -1) {
+      // Query params but no hash
+      queryPart = url.substring(queryIndex);
     }
 
-    // If there's a hash with @domain or /resource, keep it
-    // Format: portal.azure.com/GUID/#@domain/resource/...
-    if (hashPart) {
-      return `https://portal.azure.com/${tenantId}/${hashPart}`;
+    // Build the new URL with GUID, preserving query params and hash
+    // Format: portal.azure.com/GUID/?params#hash
+    if (hashPart || queryPart) {
+      return `https://portal.azure.com/${tenantId}/${queryPart}${hashPart}`;
     }
 
-    // If no hash, just add tenant to base URL
+    // If no hash or query, just add tenant to base URL
     return `https://portal.azure.com/${tenantId}/`;
   }
 

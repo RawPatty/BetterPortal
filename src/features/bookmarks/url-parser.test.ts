@@ -405,5 +405,129 @@ describe('url-parser', () => {
         expect(navUrlB).not.toMatch(/portal\.azure\.com\/[a-f0-9-]{36}\//i);
       });
     });
+
+    describe('GUID replacement for same-directory navigation', () => {
+      it('should replace old GUID with new GUID when navigating within same directory', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const urlWithOldGuid = `https://portal.azure.com/${oldGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+        const result = buildNavigationUrl(urlWithOldGuid, newGuid);
+
+        // Should have new GUID in path
+        expect(result).toContain(`portal.azure.com/${newGuid}/`);
+        // Should NOT have old GUID
+        expect(result).not.toContain(oldGuid);
+        // Should preserve domain and resource path
+        expect(result).toContain('#@contoso.onmicrosoft.com/resource/');
+      });
+
+      it('should handle URL with query params and replace GUID correctly', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const urlWithParams = `https://portal.azure.com/${oldGuid}/?feature=test#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+        const result = buildNavigationUrl(urlWithParams, newGuid);
+
+        // Should replace GUID
+        expect(result).toContain(`portal.azure.com/${newGuid}/`);
+        expect(result).not.toContain(oldGuid);
+        // Query params may or may not be preserved - that's OK
+      });
+
+      it('should work when URL has GUID in path but no #@domain', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const urlWithoutDomain = `https://portal.azure.com/${oldGuid}/#/blade/HubsExtension/BrowseResource`;
+
+        const result = buildNavigationUrl(urlWithoutDomain, newGuid);
+
+        // Should replace GUID
+        expect(result).toContain(`portal.azure.com/${newGuid}/`);
+        expect(result).not.toContain(oldGuid);
+        // Should preserve the blade path
+        expect(result).toContain('#/blade/HubsExtension/BrowseResource');
+      });
+
+      it('should validate the complete format after GUID replacement', () => {
+        const oldGuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+        const newGuid = '12345678-1234-5678-1234-567812345678';
+        const url = `https://portal.azure.com/${oldGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-1/providers/Microsoft.Storage/storageAccounts/mystorage`;
+
+        const result = buildNavigationUrl(url, newGuid);
+
+        // Expected format: portal.azure.com/{GUID}/#@domain/resource/...
+        const expectedPattern = new RegExp(`^https://portal\\.azure\\.com/${newGuid}/#@contoso\\.onmicrosoft\\.com/resource/`);
+        expect(result).toMatch(expectedPattern);
+      });
+    });
+
+    describe('Query parameter preservation', () => {
+      it('should preserve language query parameters', () => {
+        const guid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+        const url = 'https://portal.azure.com?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123';
+
+        const result = buildNavigationUrl(url, guid);
+
+        // Should preserve ?l=en.en-us
+        expect(result).toContain('?l=en.en-us');
+        expect(result).toContain(`portal.azure.com/${guid}/`);
+        expect(result).toContain('#@contoso.onmicrosoft.com');
+        expect(result).toBe(`https://portal.azure.com/${guid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`);
+      });
+
+      it('should preserve query params when replacing GUID', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const url = `https://portal.azure.com/${oldGuid}?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+        const result = buildNavigationUrl(url, newGuid);
+
+        expect(result).toContain(`portal.azure.com/${newGuid}/`);
+        expect(result).toContain('?l=en.en-us');
+        expect(result).not.toContain(oldGuid);
+      });
+
+      it('should preserve query params with trailing slash', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+        const result = buildNavigationUrl(url, newGuid);
+
+        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`);
+      });
+
+      it('should preserve multiple query parameters', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us&feature=test#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+        const result = buildNavigationUrl(url, newGuid);
+
+        expect(result).toContain('?l=en.en-us&feature=test');
+        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us&feature=test#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`);
+      });
+
+      it('should handle query params without hash', () => {
+        const oldGuid = '11111111-1111-1111-1111-111111111111';
+        const newGuid = '22222222-2222-2222-2222-222222222222';
+        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us`;
+
+        const result = buildNavigationUrl(url, newGuid);
+
+        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us`);
+      });
+
+      it('should maintain query param order and encoding', () => {
+        const guid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+        const url = 'https://portal.azure.com?l=en.en-us&redirect=%2Fhome#@contoso.onmicrosoft.com/resource/subscriptions/sub-123';
+
+        const result = buildNavigationUrl(url, guid);
+
+        // Should preserve query param order and URL encoding
+        expect(result).toContain('?l=en.en-us&redirect=%2Fhome');
+      });
+    });
   });
 });

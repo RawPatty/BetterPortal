@@ -219,23 +219,35 @@ export const overlayActions = {
     if (item.type === 'bookmark') {
       await bookmarkStore.navigate(item.id);
     } else {
-      // Navigate to history item - check for directory switching
-      let navigationUrl = item.url;
-
-      // Check if we're navigating to a different directory
+      // Navigate to history item - determine correct tenant GUID to use
       const currentDir = getCurrentDirectoryInfo();
       const itemDomain = item.tenantName?.toLowerCase() || null;
       const sameDirectory = isSameDirectory(currentDir.domain, itemDomain);
 
-      // Get tenant GUID - prefer stored tenantId, fallback to cached mapping
-      let tenantGuid = item.tenantId;
-      if (!tenantGuid && itemDomain) {
-        tenantGuid = await lookupTenantGuid(itemDomain);
+      // Get item's tenant GUID - prefer stored tenantId, fallback to cached mapping
+      let itemTenantGuid = item.tenantId;
+      if (!itemTenantGuid && itemDomain) {
+        itemTenantGuid = await lookupTenantGuid(itemDomain);
       }
 
-      if (!sameDirectory && tenantGuid) {
-        // Different directory - inject GUID into URL path for cross-tenant navigation
-        navigationUrl = buildNavigationUrl(item.url, tenantGuid);
+      // Determine which GUID to use for navigation
+      let effectiveGuid: string | null = null;
+
+      if (sameDirectory) {
+        // Same directory: prefer current GUID (we're already authenticated there)
+        // This ensures URL uses the GUID we're currently authenticated with
+        effectiveGuid = currentDir.guid || itemTenantGuid;
+        console.log('[BetterPortal] Same directory navigation - using current GUID:', effectiveGuid);
+      } else {
+        // Different directory: use target GUID for cross-tenant navigation
+        effectiveGuid = itemTenantGuid;
+        console.log('[BetterPortal] Cross-directory navigation - using target GUID:', effectiveGuid);
+      }
+
+      // Always ensure URL has correct GUID (normalize the URL)
+      let navigationUrl = item.url;
+      if (effectiveGuid) {
+        navigationUrl = buildNavigationUrl(item.url, effectiveGuid);
       }
 
       window.location.href = navigationUrl;

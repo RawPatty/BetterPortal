@@ -295,23 +295,35 @@ export const bookmarkStore = {
       accessCount: bookmark.accessCount + 1,
     });
 
-    // Determine the navigation URL
-    let navigationUrl = bookmark.url;
-
-    // Check if we're navigating to a different directory
+    // Determine correct tenant GUID to use for navigation
     const currentDir = getCurrentDirectoryInfo();
     const bookmarkDomain = bookmark.tenantName?.toLowerCase() || null;
     const sameDirectory = isSameDirectory(currentDir.domain, bookmarkDomain);
 
-    // Get tenant GUID - prefer stored tenantId, fallback to cached mapping
-    let tenantGuid = bookmark.tenantId;
-    if (!tenantGuid && bookmarkDomain) {
-      tenantGuid = await lookupTenantGuid(bookmarkDomain);
+    // Get bookmark's tenant GUID - prefer stored tenantId, fallback to cached mapping
+    let bookmarkTenantGuid = bookmark.tenantId;
+    if (!bookmarkTenantGuid && bookmarkDomain) {
+      bookmarkTenantGuid = await lookupTenantGuid(bookmarkDomain);
     }
 
-    if (!sameDirectory && tenantGuid) {
-      // Different directory - inject GUID into URL path for cross-tenant navigation
-      navigationUrl = buildNavigationUrl(bookmark.url, tenantGuid);
+    // Determine which GUID to use for navigation
+    let effectiveGuid: string | null = null;
+
+    if (sameDirectory) {
+      // Same directory: prefer current GUID (we're already authenticated there)
+      // This ensures URL uses the GUID we're currently authenticated with
+      effectiveGuid = currentDir.guid || bookmarkTenantGuid;
+      console.log('[BetterPortal] Same directory navigation - using current GUID:', effectiveGuid);
+    } else {
+      // Different directory: use target GUID for cross-tenant navigation
+      effectiveGuid = bookmarkTenantGuid;
+      console.log('[BetterPortal] Cross-directory navigation - using target GUID:', effectiveGuid);
+    }
+
+    // Always ensure URL has correct GUID (normalize the URL)
+    let navigationUrl = bookmark.url;
+    if (effectiveGuid) {
+      navigationUrl = buildNavigationUrl(bookmark.url, effectiveGuid);
     }
 
     // Navigate
