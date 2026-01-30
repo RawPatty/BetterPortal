@@ -306,24 +306,21 @@ export const bookmarkStore = {
       bookmarkTenantGuid = await lookupTenantGuid(bookmarkDomain);
     }
 
-    // Determine which GUID to use for navigation
-    let effectiveGuid: string | null = null;
+    // Determine navigation URL based on directory context
+    let navigationUrl = bookmark.url;
 
     if (sameDirectory) {
-      // Same directory: prefer current GUID (we're already authenticated there)
-      // This ensures URL uses the GUID we're currently authenticated with
-      effectiveGuid = currentDir.guid || bookmarkTenantGuid;
-      console.log('[BetterPortal] Same directory navigation - using current GUID:', effectiveGuid);
+      // Same directory: use original URL without GUID injection
+      // This avoids redirect flash when already in the correct tenant context
+      console.log('[BetterPortal] Same directory navigation - using original URL (no redirect)');
     } else {
-      // Different directory: use target GUID for cross-tenant navigation
-      effectiveGuid = bookmarkTenantGuid;
-      console.log('[BetterPortal] Cross-directory navigation - using target GUID:', effectiveGuid);
-    }
-
-    // Always ensure URL has correct GUID (normalize the URL)
-    let navigationUrl = bookmark.url;
-    if (effectiveGuid) {
-      navigationUrl = buildNavigationUrl(bookmark.url, effectiveGuid);
+      // Different directory: inject target GUID for cross-tenant navigation
+      if (bookmarkTenantGuid) {
+        navigationUrl = buildNavigationUrl(bookmark.url, bookmarkTenantGuid);
+        console.log('[BetterPortal] Cross-directory navigation - injecting target GUID:', bookmarkTenantGuid);
+      } else {
+        console.log('[BetterPortal] Cross-directory navigation requested but no GUID available - using original URL');
+      }
     }
 
     // Navigate

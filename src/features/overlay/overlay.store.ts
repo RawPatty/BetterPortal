@@ -230,24 +230,21 @@ export const overlayActions = {
         itemTenantGuid = await lookupTenantGuid(itemDomain);
       }
 
-      // Determine which GUID to use for navigation
-      let effectiveGuid: string | null = null;
+      // Determine navigation URL based on directory context
+      let navigationUrl = item.url;
 
       if (sameDirectory) {
-        // Same directory: prefer current GUID (we're already authenticated there)
-        // This ensures URL uses the GUID we're currently authenticated with
-        effectiveGuid = currentDir.guid || itemTenantGuid;
-        console.log('[BetterPortal] Same directory navigation - using current GUID:', effectiveGuid);
+        // Same directory: use original URL without GUID injection
+        // This avoids redirect flash when already in the correct tenant context
+        console.log('[BetterPortal] Same directory navigation - using original URL (no redirect)');
       } else {
-        // Different directory: use target GUID for cross-tenant navigation
-        effectiveGuid = itemTenantGuid;
-        console.log('[BetterPortal] Cross-directory navigation - using target GUID:', effectiveGuid);
-      }
-
-      // Always ensure URL has correct GUID (normalize the URL)
-      let navigationUrl = item.url;
-      if (effectiveGuid) {
-        navigationUrl = buildNavigationUrl(item.url, effectiveGuid);
+        // Different directory: inject target GUID for cross-tenant navigation
+        if (itemTenantGuid) {
+          navigationUrl = buildNavigationUrl(item.url, itemTenantGuid);
+          console.log('[BetterPortal] Cross-directory navigation - injecting target GUID:', itemTenantGuid);
+        } else {
+          console.log('[BetterPortal] Cross-directory navigation requested but no GUID available - using original URL');
+        }
       }
 
       window.location.href = navigationUrl;
