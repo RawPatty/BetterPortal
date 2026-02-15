@@ -245,7 +245,8 @@ export const historyStore = {
       return false;
     }
 
-    await storageSet('history', filtered);
+    const pruned = await this.prune(filtered);
+    await storageSet('history', pruned);
     return true;
   },
 
@@ -262,7 +263,8 @@ export const historyStore = {
       return false;
     }
 
-    await storageSet('history', filtered);
+    const pruned = await this.prune(filtered);
+    await storageSet('history', pruned);
     return true;
   },
 

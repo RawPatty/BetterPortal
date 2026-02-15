@@ -583,4 +583,75 @@ describe('historyStore', () => {
       expect(pruned).toHaveLength(20);
     });
   });
+
+  describe('delete with pruning', () => {
+    it('should prune excess entries when deleting a record', async () => {
+      const now = Date.now();
+      // Store 20 entries in storage with a limit of 5
+      const entries = Array.from({ length: 20 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      mockStorage['history'] = entries;
+
+      const { settingsStore } = await import('../settings/settings.store');
+      vi.mocked(settingsStore.get).mockResolvedValueOnce({
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 5,
+      } as any);
+
+      // Delete the most recent entry (id "0")
+      await historyStore.delete('0');
+
+      // Should have pruned to 5 entries (not 19)
+      const remaining = mockStorage['history'];
+      expect(remaining).toHaveLength(5);
+
+      // Should not contain the deleted entry
+      expect(remaining.find((e: any) => e.id === '0')).toBeUndefined();
+
+      // Should contain the next 5 most recent entries
+      expect(remaining[0].id).toBe('1');
+      expect(remaining[4].id).toBe('5');
+    });
+
+    it('should prune excess entries when deleting by resource', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 20 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      mockStorage['history'] = entries;
+
+      const { settingsStore } = await import('../settings/settings.store');
+      vi.mocked(settingsStore.get).mockResolvedValueOnce({
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 5,
+      } as any);
+
+      // Delete by resource
+      await historyStore.deleteByResource('/sub/0', 'tenant1');
+
+      const remaining = mockStorage['history'];
+      expect(remaining).toHaveLength(5);
+      expect(remaining.find((e: any) => e.resourceId === '/sub/0')).toBeUndefined();
+      expect(remaining[0].id).toBe('1');
+    });
+  });
 });
