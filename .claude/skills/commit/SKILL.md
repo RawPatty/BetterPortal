@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Create a git commit with well-structured message following BetterPortal project standards
+description: Create a git commit with well-structured message and push to remote following BetterPortal project standards
 disable-model-invocation: true
 argument-hint: [message or description]
 allowed-tools: Bash(git *)
@@ -8,7 +8,7 @@ allowed-tools: Bash(git *)
 
 # Git Commit Skill
 
-Create a git commit for staged changes following BetterPortal project standards.
+Create a git commit for staged changes following BetterPortal project standards and push to remote.
 
 ## Commit Message Format
 
@@ -41,6 +41,7 @@ Follow the project's existing pattern:
    )"
    ```
 5. **Verify**: Run `git log -1 --stat` to confirm commit was created correctly
+6. **Push to remote**: Run `git push` to push the commit to the remote repository
 
 ## Examples from BetterPortal History
 
@@ -70,3 +71,4 @@ Good commit messages from this project:
 - **Be specific**: "Fix tenant switching logic" not "Fix bug"
 - **No emoji** unless explicitly requested
 - **Check staged changes first**: Don't commit if nothing is staged
+- **Automatically pushes to remote**: After committing, the changes will be pushed to the remote repository
