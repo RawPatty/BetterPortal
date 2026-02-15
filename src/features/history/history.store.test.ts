@@ -371,4 +371,216 @@ describe('historyStore', () => {
       expect(mapping['contoso.onmicrosoft.com']).not.toEqual(mapping['fabrikam.onmicrosoft.com']);
     });
   });
+
+  describe('history limit enforcement (prune)', () => {
+    it('should remove oldest entries when limit is exceeded', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 25 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000, // Older entries have lower visitedAt
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 10,
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should only keep 10 most recent entries
+      expect(pruned).toHaveLength(10);
+
+      // Verify they are sorted by visitedAt descending (most recent first)
+      expect(pruned[0].id).toBe('0'); // Most recent
+      expect(pruned[9].id).toBe('9'); // 10th most recent
+
+      // Verify oldest entries are removed
+      expect(pruned.find(e => e.id === '24')).toBeUndefined();
+      expect(pruned.find(e => e.id === '15')).toBeUndefined();
+    });
+
+    it('should keep all entries when under the limit', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 5 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 10,
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should keep all 5 entries
+      expect(pruned).toHaveLength(5);
+      expect(pruned[0].id).toBe('0'); // Most recent
+      expect(pruned[4].id).toBe('4'); // Oldest
+    });
+
+    it('should respect both retention days and max entries', async () => {
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+
+      // Create 20 entries: 10 recent (within retention), 10 old (outside retention)
+      const entries = [
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: `recent-${i}`,
+          resourceId: `/sub/recent-${i}`,
+          tenantId: 'tenant1',
+          tenantName: 'Tenant 1',
+          displayName: `Recent App ${i}`,
+          visitedAt: now - i * 1000, // Recent entries
+          visitCount: 1,
+          url: `https://portal.azure.com/#recent-${i}`,
+        })),
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: `old-${i}`,
+          resourceId: `/sub/old-${i}`,
+          tenantId: 'tenant1',
+          tenantName: 'Tenant 1',
+          displayName: `Old App ${i}`,
+          visitedAt: now - (40 * oneDayMs) - i * 1000, // 40 days old
+          visitCount: 1,
+          url: `https://portal.azure.com/#old-${i}`,
+        })),
+      ];
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30, // Remove entries older than 30 days
+        historyMaxEntries: 5, // Keep max 5 entries
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should first filter by retention (10 entries), then limit to 5
+      expect(pruned).toHaveLength(5);
+
+      // All pruned entries should be recent (not old)
+      pruned.forEach(entry => {
+        expect(entry.id).toContain('recent-');
+      });
+
+      // Should keep the 5 most recent entries
+      expect(pruned[0].id).toBe('recent-0');
+      expect(pruned[4].id).toBe('recent-4');
+    });
+
+    it('should handle limit of 1', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 10 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 1,
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should keep only the most recent entry
+      expect(pruned).toHaveLength(1);
+      expect(pruned[0].id).toBe('0');
+    });
+
+    it('should handle large limit (5000)', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 100 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 5000,
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should keep all 100 entries (under limit)
+      expect(pruned).toHaveLength(100);
+    });
+
+    it('should sort entries by visitedAt descending', async () => {
+      const now = Date.now();
+      // Create entries in random order
+      const entries = [
+        { id: '2', resourceId: '/sub/2', tenantId: 'tenant1', tenantName: 'Tenant 1', displayName: 'App 2', visitedAt: now - 2000, visitCount: 1, url: 'https://portal.azure.com/#2' },
+        { id: '0', resourceId: '/sub/0', tenantId: 'tenant1', tenantName: 'Tenant 1', displayName: 'App 0', visitedAt: now, visitCount: 1, url: 'https://portal.azure.com/#0' },
+        { id: '1', resourceId: '/sub/1', tenantId: 'tenant1', tenantName: 'Tenant 1', displayName: 'App 1', visitedAt: now - 1000, visitCount: 1, url: 'https://portal.azure.com/#1' },
+      ];
+
+      const settings = {
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 10,
+      };
+
+      const pruned = await historyStore.prune(entries, settings);
+
+      // Should be sorted by visitedAt descending
+      expect(pruned[0].id).toBe('0'); // Most recent
+      expect(pruned[1].id).toBe('1');
+      expect(pruned[2].id).toBe('2'); // Oldest
+    });
+
+    it('should use default max entries from settings when not provided', async () => {
+      const now = Date.now();
+      const entries = Array.from({ length: 600 }, (_, i) => ({
+        id: String(i),
+        resourceId: `/sub/${i}`,
+        tenantId: 'tenant1',
+        tenantName: 'Tenant 1',
+        displayName: `App ${i}`,
+        visitedAt: now - i * 1000,
+        visitCount: 1,
+        url: `https://portal.azure.com/#${i}`,
+      }));
+
+      // Mock settings store to return default of 20 (new default)
+      const { settingsStore } = await import('../settings/settings.store');
+      vi.mocked(settingsStore.get).mockResolvedValueOnce({
+        historyEnabled: true,
+        historyRetentionDays: 30,
+        historyMaxEntries: 20, // New default
+      } as any);
+
+      const pruned = await historyStore.prune(entries);
+
+      // Should use the default max entries from settings (20)
+      expect(pruned).toHaveLength(20);
+    });
+  });
 });

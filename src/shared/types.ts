@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hotkey: { key: 'Space', ctrl: true, shift: false, alt: false, meta: false },
   historyEnabled: true,
   historyRetentionDays: 30,
-  historyMaxEntries: 500,
+  historyMaxEntries: 20,
   autoBookmark: false, // Disabled - pages go to history first, user explicitly bookmarks
   theme: 'light',
   defaultStateDepth: 'full',

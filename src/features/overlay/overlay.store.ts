@@ -296,6 +296,31 @@ export const overlayActions = {
   },
 
   /**
+   * Convert a history item to a bookmark
+   */
+  async saveHistoryItem(historyEntry: HistoryEntry) {
+    // Convert history entry to bookmark format
+    const bookmark: Bookmark = {
+      id: crypto.randomUUID(),
+      url: historyEntry.url,
+      tenantId: historyEntry.tenantId,
+      tenantName: historyEntry.tenantName,
+      resourceId: historyEntry.resourceId,
+      displayName: historyEntry.displayName,
+      alias: null,
+      stateDepth: 'full', // Default to full state for history items
+      createdAt: Date.now(),
+      lastAccessed: Date.now(),
+      accessCount: 0,
+      isStale: false,
+    };
+
+    // Save the bookmark
+    await bookmarkStore.save(bookmark);
+    await this.refresh();
+  },
+
+  /**
    * Set search query
    */
   setSearch(query: string) {

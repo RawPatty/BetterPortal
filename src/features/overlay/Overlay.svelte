@@ -182,7 +182,13 @@
 
       case 'a':
         event.preventDefault();
-        overlayActions.saveCurrentPage();
+        // If there's a selected history item, convert it to a bookmark
+        // Otherwise, bookmark the current page
+        if (currentItem?.type === 'history') {
+          overlayActions.saveHistoryItem(currentItem);
+        } else {
+          overlayActions.saveCurrentPage();
+        }
         break;
 
       case 's':

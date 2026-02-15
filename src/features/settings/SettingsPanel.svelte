@@ -208,12 +208,12 @@
             />
           </div>
           <div class="bp-settings-row">
-            <label for="maxEntries">Max entries</label>
+            <label for="maxEntries">Max history entries</label>
             <input
               id="maxEntries"
               type="number"
-              min="10"
-              max="1000"
+              min="1"
+              max="5000"
               bind:value={settings.historyMaxEntries}
               on:change={saveSettings}
             />
