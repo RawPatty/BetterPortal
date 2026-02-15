@@ -50,7 +50,7 @@ npm test
 | `Enter` | Open selected item |
 | `/` | Focus search |
 | `Esc` | Close overlay |
-| `a` | Add current page as bookmark |
+| `a` | Bookmark current page, or convert selected history item to bookmark |
 | `d` | Delete selected bookmark |
 | `?` | Open settings |
 
@@ -63,8 +63,9 @@ npm test
 ### History
 
 - Automatically captures visited Azure resources
-- Navigate to any resource and press `a` to bookmark it
+- Select a history item and press `a` to promote it to a bookmark
 - Configurable retention period (default: 30 days)
+- Configurable max history entries (default: 20, range: 1-5000)
 
 ### Import/Export
 
@@ -109,6 +110,7 @@ Configurable options:
 - Theme (Light, Dark)
 - History enable/disable
 - History retention period
+- Max history entries
 
 ## Development
 
@@ -169,7 +171,6 @@ Contributions are welcome! Here's how you can help:
 
 ### Planned
 - 🔄 Resource diffing and snapshots
-- 🔄 Direct promotion of selected history items to bookmarks
 - 🔄 Cloud sync for bookmarks (paid feature)
 - 🔄 Team collaboration features
 - 🔄 Advanced filtering and tagging
