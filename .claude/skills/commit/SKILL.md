@@ -72,3 +72,4 @@ Good commit messages from this project:
 - **No emoji** unless explicitly requested
 - **Check staged changes first**: Don't commit if nothing is staged
 - **Automatically pushes to remote**: After committing, the changes will be pushed to the remote repository
+- **Bump the version**: When committing feature or bug fix changes, bump the version in both `src/manifest.json` and `package.json` (keep them in sync). Use patch version increments (e.g., 1.0.64 → 1.0.65). Include the version bump in the same commit as the changes.
