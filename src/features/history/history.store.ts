@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, isErrorPage } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -20,9 +20,29 @@ async function saveTenantMapping(mapping: TenantMapping): Promise<void> {
 async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
   if (!tenantGuid || !tenantDomain) return;
   const mapping = await getTenantMapping();
-  if (mapping[tenantDomain] !== tenantGuid) {
+  const isNew = mapping[tenantDomain] !== tenantGuid;
+  if (isNew) {
     mapping[tenantDomain] = tenantGuid;
     await saveTenantMapping(mapping);
+  }
+
+  // Backfill existing history entries that have null tenantId for this domain
+  const history = await storageGet('history');
+  if (history) {
+    let updated = false;
+    for (const entry of history) {
+      if (!entry.tenantId && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
+        entry.tenantId = tenantGuid;
+        if (!entry.url.includes(tenantGuid)) {
+          entry.url = buildNavigationUrl(entry.url, tenantGuid);
+        }
+        updated = true;
+      }
+    }
+    if (updated) {
+      await storageSet('history', history);
+      console.log('[BetterPortal] Backfilled null history tenantIds for domain:', tenantDomain);
+    }
   }
 }
 
@@ -109,11 +129,35 @@ export const historyStore = {
       let effectiveTenantId: string | null = null;
 
       if (parsed.tenantId && guidRegex.test(parsed.tenantId)) {
-        // URL has GUID in path - this is the ONLY reliable source
+        // URL has GUID in path - most reliable source
         effectiveTenantId = parsed.tenantId;
         // Cache this mapping since it came from URL (reliable)
         if (parsed.tenantDomain) {
           await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+        }
+      } else {
+        // URL does not have GUID in path - try fallbacks
+        // Fallback 1: Try page context / MSAL — reliable for current page's tenant at save time
+        if (!effectiveTenantId) {
+          effectiveTenantId = getTenantGuidFromPortal();
+          if (effectiveTenantId) {
+            console.log('[BetterPortal] History: Got tenant GUID from page context/MSAL:', effectiveTenantId);
+            const domain = parsed.tenantDomain || effectiveTenantName;
+            if (domain && domain !== 'Unknown Tenant') {
+              await learnTenantMapping(effectiveTenantId, domain);
+            }
+          }
+        }
+
+        // Fallback 2: Try cached domain→GUID mapping
+        if (!effectiveTenantId) {
+          const domain = parsed.tenantDomain || effectiveTenantName;
+          if (domain && domain !== 'Unknown Tenant') {
+            effectiveTenantId = await lookupTenantGuid(domain);
+            if (effectiveTenantId) {
+              console.log('[BetterPortal] History: Got tenant GUID from cached mapping:', effectiveTenantId);
+            }
+          }
         }
       }
 

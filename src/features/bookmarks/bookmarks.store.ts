@@ -11,6 +11,7 @@ import {
   buildNavigationUrl,
   getCurrentDirectoryInfo,
   isSameDirectory,
+  getTenantGuidFromPortal,
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
 
@@ -35,9 +36,29 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
   if (!tenantGuid || !tenantDomain) return;
 
   const mapping = await getTenantMapping();
-  if (mapping[tenantDomain] !== tenantGuid) {
+  const isNew = mapping[tenantDomain] !== tenantGuid;
+  if (isNew) {
     mapping[tenantDomain] = tenantGuid;
     await saveTenantMapping(mapping);
+  }
+
+  // Backfill existing bookmarks that have null tenantId for this domain
+  const bookmarks = await storageGet('bookmarks');
+  if (bookmarks) {
+    let updated = false;
+    for (const entry of bookmarks) {
+      if (!entry.tenantId && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
+        entry.tenantId = tenantGuid;
+        if (!entry.url.includes(tenantGuid)) {
+          entry.url = buildNavigationUrl(entry.url, tenantGuid);
+        }
+        updated = true;
+      }
+    }
+    if (updated) {
+      await storageSet('bookmarks', bookmarks);
+      console.log('[BetterPortal] Backfilled null tenantIds for domain:', tenantDomain);
+    }
   }
 }
 
@@ -172,11 +193,35 @@ export const bookmarkStore = {
       }
       console.log('[BetterPortal] Using GUID from URL path (reliable):', effectiveTenantId);
     } else {
-      // URL does not have GUID in path - cross-tenant navigation won't work reliably
-      // We could try cache/MSAL, but they're often wrong after directory switches
-      // Better to leave tenantId as null and keep the original #@domain URL format
-      console.log('[BetterPortal] No GUID in URL path - keeping original URL format');
-      console.log('[BetterPortal] Cross-tenant navigation requires GUID in URL. Please navigate to the resource first, then save.');
+      // URL does not have GUID in path - try fallbacks
+      console.log('[BetterPortal] No GUID in URL path - trying fallbacks');
+
+      // Fallback 1: Try page context / MSAL — reliable for current page's tenant at save time
+      if (!effectiveTenantId) {
+        effectiveTenantId = getTenantGuidFromPortal();
+        if (effectiveTenantId) {
+          console.log('[BetterPortal] Got tenant GUID from page context/MSAL:', effectiveTenantId);
+          const domain = parsed.tenantDomain || effectiveTenantName;
+          if (domain && domain !== 'Unknown Tenant') {
+            await learnTenantMapping(effectiveTenantId, domain);
+          }
+        }
+      }
+
+      // Fallback 2: Try cached domain→GUID mapping
+      if (!effectiveTenantId) {
+        const domain = parsed.tenantDomain || effectiveTenantName;
+        if (domain && domain !== 'Unknown Tenant') {
+          effectiveTenantId = await lookupTenantGuid(domain);
+          if (effectiveTenantId) {
+            console.log('[BetterPortal] Got tenant GUID from cached mapping:', effectiveTenantId);
+          }
+        }
+      }
+
+      if (!effectiveTenantId) {
+        console.log('[BetterPortal] No tenant GUID available from any source');
+      }
     }
 
     // If we have a GUID tenant ID, ensure the URL has it in the path for reliable navigation

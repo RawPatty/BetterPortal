@@ -34,6 +34,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   extractResourceName: vi.fn(() => 'my-app'),
   getTenantNameFromDOM: vi.fn(() => 'Test Tenant'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
+  getTenantGuidFromPortal: vi.fn(() => null),
   isErrorPage: vi.fn(() => false), // Mock as not an error page by default
   buildNavigationUrl: vi.fn((url: string, tenantId: string) => {
     if (!tenantId || tenantId === 'unknown') return url;
@@ -52,6 +53,7 @@ vi.mock('../bookmarks/url-parser', () => ({
 
 import { historyStore } from './history.store';
 import { storageGet, storageSet } from '../../shared/storage';
+import { parsePortalUrl, getTenantGuidFromPortal } from '../bookmarks/url-parser';
 
 describe('historyStore', () => {
   beforeEach(() => {
@@ -581,6 +583,144 @@ describe('historyStore', () => {
 
       // Should use the default max entries from settings (20)
       expect(pruned).toHaveLength(20);
+    });
+  });
+
+  describe('tenant GUID fallbacks at save time', () => {
+    it('should use getTenantGuidFromPortal when URL has no GUID', async () => {
+      // parsePortalUrl returns non-GUID tenantId, so fallback kicks in
+      const mockGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(mockGuid);
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
+      } as any);
+
+      const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123');
+
+      expect(entry).not.toBeNull();
+      expect(entry!.tenantId).toBe(mockGuid);
+    });
+
+    it('should use cached mapping when no URL GUID and no page context', async () => {
+      // Pre-populate the tenant mapping cache
+      mockStorage['tenantMapping'] = {
+        'contoso.onmicrosoft.com': '88888888-8888-8888-8888-888888888888',
+      };
+
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-456/resourceGroups/rg-test/providers/Microsoft.Web/sites/other-app',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-456',
+      } as any);
+
+      const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-456');
+
+      expect(entry).not.toBeNull();
+      expect(entry!.tenantId).toBe('88888888-8888-8888-8888-888888888888');
+    });
+
+    it('should leave tenantId null when no source has a GUID', async () => {
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'unknown-domain.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-789/resourceGroups/rg-test/providers/Microsoft.Web/sites/app3',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@unknown-domain.onmicrosoft.com/resource/subscriptions/sub-789',
+      } as any);
+
+      const entry = await historyStore.upsert('https://portal.azure.com/#@unknown-domain.onmicrosoft.com/resource/subscriptions/sub-789');
+
+      expect(entry).not.toBeNull();
+      expect(entry!.tenantId).toBeNull();
+    });
+  });
+
+  describe('backfill null tenantIds on mapping learned', () => {
+    it('should backfill existing entries when a new mapping is learned', async () => {
+      const guid = '77777777-7777-7777-7777-777777777777';
+      // Pre-populate history with entries that have null tenantId
+      mockStorage['history'] = [
+        {
+          id: 'old-1',
+          resourceId: '/sub/old-1',
+          tenantId: null,
+          tenantName: 'contoso.onmicrosoft.com',
+          displayName: 'Old App 1',
+          visitedAt: Date.now() - 5000,
+          visitCount: 1,
+          url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/old-1',
+        },
+        {
+          id: 'old-2',
+          resourceId: '/sub/old-2',
+          tenantId: null,
+          tenantName: 'fabrikam.onmicrosoft.com',
+          displayName: 'Old App 2',
+          visitedAt: Date.now() - 4000,
+          visitCount: 1,
+          url: 'https://portal.azure.com/#@fabrikam.onmicrosoft.com/resource/sub/old-2',
+        },
+      ];
+      mockStorage['tenantMapping'] = {};
+
+      // Now trigger an upsert with a URL that has GUID for contoso
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: guid,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/new-sub/resourceGroups/rg/providers/Microsoft.Web/sites/new-app',
+        blade: null,
+        fullUrl: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/new-sub`,
+      } as any);
+
+      await historyStore.upsert(`https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/new-sub`);
+
+      // Check that old-1 (contoso) got backfilled
+      const history = mockStorage['history'];
+      const old1 = history.find((e: any) => e.id === 'old-1');
+      expect(old1.tenantId).toBe(guid);
+
+      // old-2 (fabrikam) should NOT be backfilled
+      const old2 = history.find((e: any) => e.id === 'old-2');
+      expect(old2.tenantId).toBeNull();
+    });
+
+    it('should update URL with GUID during backfill', async () => {
+      const guid = '66666666-6666-6666-6666-666666666666';
+      mockStorage['history'] = [
+        {
+          id: 'url-test',
+          resourceId: '/sub/url-test',
+          tenantId: null,
+          tenantName: 'contoso.onmicrosoft.com',
+          displayName: 'URL Test App',
+          visitedAt: Date.now() - 5000,
+          visitCount: 1,
+          url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/url-test',
+        },
+      ];
+      mockStorage['tenantMapping'] = {};
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: guid,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/trigger/resourceGroups/rg/providers/Microsoft.Web/sites/trigger-app',
+        blade: null,
+        fullUrl: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/trigger`,
+      } as any);
+
+      await historyStore.upsert(`https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/trigger`);
+
+      const history = mockStorage['history'];
+      const backfilled = history.find((e: any) => e.id === 'url-test');
+      expect(backfilled.url).toContain(guid);
     });
   });
 
