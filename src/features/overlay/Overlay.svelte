@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { tick } from 'svelte';
   import {
     isOverlayOpen,
     overlayMode,
@@ -16,6 +17,11 @@
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
   let showSettings = false;
+
+  // Inline rename state
+  let editingItemId: string | null = null;
+  let editingTenantKey: string | null = null;
+  let editValue = '';
 
   // Track flat index for vim navigation
   $: flatItems = $filteredItems;
@@ -109,6 +115,11 @@
       return;
     }
 
+    // Don't handle keys when inline rename is active (let the input handle them)
+    if (editingItemId || editingTenantKey) {
+      return;
+    }
+
     // Check if user is typing in search input
     const isTypingInSearch = document.activeElement === searchInputRef;
 
@@ -191,16 +202,17 @@
         }
         break;
 
-      case 's':
-        event.preventDefault();
-        // TODO: Capture snapshot
-        console.log('[BetterPortal] Snapshot capture - not yet implemented');
-        break;
-
       case 'd':
         if (!event.ctrlKey) {
           event.preventDefault();
           overlayActions.deleteSelected();
+        }
+        break;
+
+      case 'e':
+        event.preventDefault();
+        if (currentItem?.type === 'bookmark') {
+          startEditItem(currentItem);
         }
         break;
 
@@ -240,6 +252,68 @@
   function scrollToSelected() {
     const selectedEl = listRef?.querySelector('.bp-item--selected');
     selectedEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function startEditItem(item: any) {
+    if (item.type !== 'bookmark') return; // Only bookmarks have alias
+    editingItemId = item.id;
+    editingTenantKey = null;
+    editValue = item.alias || item.displayName;
+    tick().then(() => {
+      const input = listRef?.querySelector('.bp-rename-input') as HTMLInputElement;
+      input?.focus();
+      input?.select();
+    });
+  }
+
+  function startEditTenant(tenantKey: string, currentDisplayName: string) {
+    editingTenantKey = tenantKey;
+    editingItemId = null;
+    editValue = currentDisplayName;
+    tick().then(() => {
+      const input = listRef?.querySelector('.bp-rename-input') as HTMLInputElement;
+      input?.focus();
+      input?.select();
+    });
+  }
+
+  function cancelEdit() {
+    editingItemId = null;
+    editingTenantKey = null;
+    editValue = '';
+  }
+
+  async function saveEdit() {
+    const trimmed = editValue.trim();
+    if (editingItemId) {
+      // Saving bookmark alias: empty means clear alias (revert to auto name)
+      const item = flatItems.find((i: any) => i.id === editingItemId);
+      if (item) {
+        const originalName = item.displayName;
+        const alias = (trimmed && trimmed !== originalName) ? trimmed : null;
+        await overlayActions.renameBookmark(editingItemId, alias);
+      }
+    } else if (editingTenantKey) {
+      // Saving tenant alias: empty means clear alias (revert to domain)
+      // Get the original tenantName from the group data
+      const group = $itemsByTenant.get(editingTenantKey);
+      const originalName = group?.tenantName || editingTenantKey;
+      const alias = (trimmed && trimmed !== originalName) ? trimmed : null;
+      await overlayActions.renameTenant(editingTenantKey, alias);
+    }
+    cancelEdit();
+  }
+
+  function handleRenameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      saveEdit();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelEdit();
+    }
   }
 
   function handleBackdropClick(event: MouseEvent) {
@@ -295,7 +369,20 @@
                   <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                   </svg>
-                  <span class="bp-tenant-name">{group.tenantName}</span>
+                  {#if editingTenantKey === tenantId}
+                    <!-- svelte-ignore a11y-autofocus -->
+                    <input
+                      class="bp-rename-input bp-rename-tenant"
+                      type="text"
+                      bind:value={editValue}
+                      on:keydown={handleRenameKeydown}
+                      on:blur={cancelEdit}
+                    />
+                  {:else}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                    <span class="bp-tenant-name bp-tenant-name--editable" on:click={() => startEditTenant(tenantId, group.displayName)}>{group.displayName}</span>
+                  {/if}
                 </div>
                 <span class="bp-tenant-count">{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span>
               </div>
@@ -326,9 +413,20 @@
                       </svg>
                     {/if}
                   </span>
-                  <span class="bp-item-name">
-                    {'alias' in item && item.alias ? item.alias : item.displayName}
-                  </span>
+                  {#if editingItemId === item.id}
+                    <!-- svelte-ignore a11y-autofocus -->
+                    <input
+                      class="bp-rename-input bp-rename-item"
+                      type="text"
+                      bind:value={editValue}
+                      on:keydown={handleRenameKeydown}
+                      on:blur={cancelEdit}
+                    />
+                  {:else}
+                    <span class="bp-item-name">
+                      {'alias' in item && item.alias ? item.alias : item.displayName}
+                    </span>
+                  {/if}
                   {#if 'isStale' in item && item.isStale}
                     <span class="bp-item-badge bp-item-badge--stale" title="Resource may be unavailable">!</span>
                   {/if}
@@ -345,6 +443,7 @@
           <span><kbd>Enter</kbd> open</span>
           <span><kbd>/</kbd> search</span>
           <span><kbd>a</kbd> add</span>
+          <span><kbd>e</kbd> rename</span>
           <span><kbd>d</kbd> delete</span>
           <span><kbd>?</kbd> settings</span>
           <span><kbd>Esc</kbd> close</span>
@@ -498,6 +597,41 @@
 
   .bp-tenant-name {
     font-weight: 600;
+  }
+
+  .bp-tenant-name--editable {
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+  }
+
+  .bp-tenant-name--editable:hover {
+    background: var(--bp-bg-secondary, rgba(0, 0, 0, 0.06));
+  }
+
+  .bp-rename-input {
+    font-family: inherit;
+    border: 2px solid var(--bp-accent, #0078d4);
+    border-radius: 3px;
+    outline: none;
+    background: var(--bp-bg, #fff);
+    color: var(--bp-text, #323130);
+    box-sizing: border-box;
+  }
+
+  .bp-rename-tenant {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 4px;
+    width: 200px;
+  }
+
+  .bp-rename-item {
+    flex: 1;
+    font-size: 14px;
+    padding: 2px 6px;
+    min-width: 0;
   }
 
   .bp-tenant-count {

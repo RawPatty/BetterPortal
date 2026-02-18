@@ -46,8 +46,6 @@ export interface Settings {
   theme: 'light' | 'dark';
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
-  diffIgnoredPaths: string[];
-  maxSnapshotsPerResource: number;
   lastExportedAt: number | null;
 }
 
@@ -60,47 +58,8 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'light',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
-  diffIgnoredPaths: ['etag', 'systemData', 'properties.provisioningState'],
-  maxSnapshotsPerResource: 5,
   lastExportedAt: null,
 };
-
-// ============ Snapshots & Diff ============
-export interface RoleAssignment {
-  principalId: string;
-  principalName: string;
-  roleDefinitionId: string;
-  roleName: string;
-  scope: string;
-}
-
-export interface Snapshot {
-  id: string;
-  resourceId: string;
-  tenantId: string;
-  capturedAt: number;
-  armState: Record<string, unknown>;
-  iamAssignments: RoleAssignment[];
-  label: string;
-}
-
-export interface PropertyDiff {
-  path: string;
-  type: 'added' | 'removed' | 'changed';
-  oldValue?: unknown;
-  newValue?: unknown;
-}
-
-export interface DiffResult {
-  snapshotA: Snapshot;
-  snapshotB: Snapshot;
-  armDiff: PropertyDiff[];
-  iamDiff: {
-    added: RoleAssignment[];
-    removed: RoleAssignment[];
-    unchanged: number;
-  };
-}
 
 // ============ Storage Schema ============
 export interface StorageSchema {
@@ -110,8 +69,7 @@ export interface StorageSchema {
   history_version: number;
   settings: Settings;
   settings_version: number;
-  snapshots: Snapshot[];
-  snapshots_version: number;
+  tenantAliases: Record<string, string>; // tenantName domain → user-defined alias
 }
 
 // ============ URL Parsing ============
@@ -124,7 +82,7 @@ export interface ParsedPortalUrl {
 }
 
 // ============ Overlay State ============
-export type OverlayMode = 'navigate' | 'search' | 'settings' | 'diff';
+export type OverlayMode = 'navigate' | 'search' | 'settings';
 
 export interface OverlayState {
   isOpen: boolean;

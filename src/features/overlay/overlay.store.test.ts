@@ -50,8 +50,9 @@ vi.mock('../history/history.store', () => ({
   },
 }));
 
-import { overlayActions } from './overlay.store';
+import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery } from './overlay.store';
 import { storageGet, storageSet } from '../../shared/storage';
+import { get } from 'svelte/store';
 
 describe('overlayActions', () => {
   beforeEach(() => {
@@ -147,6 +148,152 @@ describe('overlayActions', () => {
       expect(bookmark.id).not.toBe(historyEntry.id);
       // Should be a valid UUID format
       expect(bookmark.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  });
+
+  describe('renameBookmark', () => {
+    it('should set alias on a bookmark', async () => {
+      mockStorage['bookmarks'] = [{
+        id: 'bm-1',
+        url: 'https://portal.azure.com/#resource/test',
+        tenantId: 'tenant-1',
+        tenantName: 'test.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-1',
+        displayName: 'Original Name',
+        alias: null,
+        stateDepth: 'full',
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        accessCount: 0,
+        isStale: false,
+      }];
+
+      await overlayActions.renameBookmark('bm-1', 'My Custom Name');
+
+      const saved = mockStorage['bookmarks'];
+      expect(saved[0].alias).toBe('My Custom Name');
+    });
+
+    it('should clear alias when set to null', async () => {
+      mockStorage['bookmarks'] = [{
+        id: 'bm-1',
+        url: 'https://portal.azure.com/#resource/test',
+        tenantId: 'tenant-1',
+        tenantName: 'test.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-1',
+        displayName: 'Original Name',
+        alias: 'Old Alias',
+        stateDepth: 'full',
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        accessCount: 0,
+        isStale: false,
+      }];
+
+      await overlayActions.renameBookmark('bm-1', null);
+
+      const saved = mockStorage['bookmarks'];
+      expect(saved[0].alias).toBe(null);
+    });
+  });
+
+  describe('renameTenant', () => {
+    it('should save a tenant alias', async () => {
+      await overlayActions.renameTenant('contoso.onmicrosoft.com', 'Contoso Production');
+
+      expect(storageSet).toHaveBeenCalledWith('tenantAliases', {
+        'contoso.onmicrosoft.com': 'Contoso Production',
+      });
+      expect(get(tenantAliases)).toEqual({
+        'contoso.onmicrosoft.com': 'Contoso Production',
+      });
+    });
+
+    it('should remove a tenant alias when set to null', async () => {
+      // Pre-populate with an existing alias
+      tenantAliases.set({ 'contoso.onmicrosoft.com': 'Contoso Production' });
+
+      await overlayActions.renameTenant('contoso.onmicrosoft.com', null);
+
+      expect(storageSet).toHaveBeenCalledWith('tenantAliases', {});
+      expect(get(tenantAliases)).toEqual({});
+    });
+
+    it('should preserve other tenant aliases when updating one', async () => {
+      tenantAliases.set({ 'other.onmicrosoft.com': 'Other Tenant' });
+
+      await overlayActions.renameTenant('contoso.onmicrosoft.com', 'Contoso');
+
+      const result = get(tenantAliases);
+      expect(result).toEqual({
+        'other.onmicrosoft.com': 'Other Tenant',
+        'contoso.onmicrosoft.com': 'Contoso',
+      });
+    });
+  });
+
+  describe('search with aliases', () => {
+    it('should match items by tenant alias in search', () => {
+      // Set up bookmarks with a tenant
+      bookmarks.set([{
+        id: 'bm-1',
+        url: 'https://portal.azure.com/#resource/test',
+        tenantId: 'tenant-1',
+        tenantName: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-1',
+        displayName: 'My App',
+        alias: null,
+        stateDepth: 'full' as const,
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        accessCount: 0,
+        isStale: false,
+      }]);
+
+      // Set tenant alias
+      tenantAliases.set({ 'contoso.onmicrosoft.com': 'Production Environment' });
+
+      // Search by tenant alias
+      searchQuery.set('Production');
+
+      const items = get(filteredItems);
+      expect(items).toHaveLength(1);
+      expect(items[0].displayName).toBe('My App');
+
+      // Clean up
+      searchQuery.set('');
+      bookmarks.set([]);
+      tenantAliases.set({});
+    });
+
+    it('should match items by bookmark alias in search', () => {
+      bookmarks.set([{
+        id: 'bm-1',
+        url: 'https://portal.azure.com/#resource/test',
+        tenantId: 'tenant-1',
+        tenantName: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-1',
+        displayName: 'webapp-prod-eastus',
+        alias: 'Main Production Site',
+        stateDepth: 'full' as const,
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        accessCount: 0,
+        isStale: false,
+      }]);
+
+      tenantAliases.set({});
+
+      // Search by alias
+      searchQuery.set('Main Production');
+
+      const items = get(filteredItems);
+      expect(items).toHaveLength(1);
+      expect(items[0].id).toBe('bm-1');
+
+      // Clean up
+      searchQuery.set('');
+      bookmarks.set([]);
     });
   });
 });

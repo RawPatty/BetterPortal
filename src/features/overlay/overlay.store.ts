@@ -9,6 +9,7 @@ import {
   isSameDirectory,
   buildNavigationUrl,
 } from '../bookmarks/url-parser';
+import { storageGet, storageSet } from '../../shared/storage';
 
 // Store for overlay visibility
 export const isOverlayOpen = writable(false);
@@ -31,13 +32,16 @@ export const history = writable<HistoryEntry[]>([]);
 // Store for settings
 export const settings = writable<Settings | null>(null);
 
+// Store for tenant aliases (tenantName domain → user alias)
+export const tenantAliases = writable<Record<string, string>>({});
+
 // Combined items for display
 export type DisplayItem = (Bookmark | HistoryEntry) & { type: 'bookmark' | 'history' };
 
 // Derived store for filtered items based on search
 export const filteredItems = derived(
-  [bookmarks, history, searchQuery, overlayMode],
-  ([$bookmarks, $history, $searchQuery, $mode]) => {
+  [bookmarks, history, searchQuery, overlayMode, tenantAliases],
+  ([$bookmarks, $history, $searchQuery, $mode, $tenantAliases]) => {
     let items: DisplayItem[] = [];
 
     // Track seen resources to deduplicate (resourceId:tenantId)
@@ -67,10 +71,13 @@ export const filteredItems = derived(
     if ($searchQuery.trim()) {
       const query = $searchQuery.toLowerCase();
       items = items.filter((item) => {
+        const tenantKey = item.tenantName || item.tenantId;
+        const tenantAlias = tenantKey ? $tenantAliases[tenantKey] : null;
         const searchText = [
           item.displayName,
           'alias' in item ? item.alias : null,
           item.tenantName,
+          tenantAlias,
           item.resourceId,
         ]
           .filter(Boolean)
@@ -105,24 +112,28 @@ export const filteredItems = derived(
 );
 
 // Derived store for items grouped by tenant (group by tenantName for display, not tenantId)
-export const itemsByTenant = derived(filteredItems, ($items) => {
-  const grouped = new Map<string, { tenantName: string; items: DisplayItem[] }>();
+export const itemsByTenant = derived(
+  [filteredItems, tenantAliases],
+  ([$items, $tenantAliases]) => {
+    const grouped = new Map<string, { tenantName: string; displayName: string; items: DisplayItem[] }>();
 
-  for (const item of $items) {
-    // Group by tenantName (domain) for display purposes
-    // tenantId may be a GUID (for navigation) which would create separate groups for same tenant
-    const key = item.tenantName || item.tenantId;
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        tenantName: item.tenantName,
-        items: [],
-      });
+    for (const item of $items) {
+      // Group by tenantName (domain) for display purposes
+      // tenantId may be a GUID (for navigation) which would create separate groups for same tenant
+      const key = item.tenantName || item.tenantId;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          tenantName: item.tenantName,
+          displayName: $tenantAliases[key] || item.tenantName,
+          items: [],
+        });
+      }
+      grouped.get(key)!.items.push(item);
     }
-    grouped.get(key)!.items.push(item);
-  }
 
-  return grouped;
-});
+    return grouped;
+  }
+);
 
 // Actions
 export const overlayActions = {
@@ -159,14 +170,16 @@ export const overlayActions = {
    */
   async refresh() {
     try {
-      const [bookmarkData, settingsData] = await Promise.all([
+      const [bookmarkData, settingsData, tenantAliasData] = await Promise.all([
         bookmarkStore.getAll(),
         settingsStore.get(),
+        storageGet('tenantAliases'),
       ]);
 
       console.log('[BetterPortal] Loaded', bookmarkData.length, 'bookmarks');
       bookmarks.set(bookmarkData);
       settings.set(settingsData);
+      tenantAliases.set(tenantAliasData || {});
 
       // Also refresh history if available (use settings for limit)
       try {
@@ -318,6 +331,29 @@ export const overlayActions = {
     // Save the bookmark
     await bookmarkStore.save(bookmark);
     await this.refresh();
+  },
+
+  /**
+   * Rename a bookmark (set alias)
+   */
+  async renameBookmark(id: string, alias: string | null) {
+    await bookmarkStore.update(id, { alias });
+    await this.refresh();
+  },
+
+  /**
+   * Rename a tenant (set alias for tenant group header)
+   */
+  async renameTenant(tenantKey: string, alias: string | null) {
+    const current = get(tenantAliases);
+    const updated = { ...current };
+    if (alias) {
+      updated[tenantKey] = alias;
+    } else {
+      delete updated[tenantKey];
+    }
+    await storageSet('tenantAliases', updated);
+    tenantAliases.set(updated);
   },
 
   /**
