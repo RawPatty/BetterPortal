@@ -214,4 +214,43 @@ describe('bookmarkStore', () => {
       expect(backfilled.url).toContain(guid);
     });
   });
+
+  describe('learnTenantMapping backfill', () => {
+    it('should backfill domain-string tenantId with GUID', async () => {
+      const domainGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      // Seed a bookmark with a domain string as tenantId (old format)
+      mockStorage['bookmarks'] = [{
+        id: 'bm-1',
+        url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+        tenantId: 'contoso.onmicrosoft.com',
+        tenantName: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+        displayName: 'app',
+        alias: null,
+        stateDepth: 'resource' as const,
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        accessCount: 0,
+        isStale: false,
+      }];
+
+      // Trigger learnTenantMapping by saving a bookmark on a page with GUID in URL
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: domainGuid,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.Web/sites/other',
+        blade: null,
+        fullUrl: `https://portal.azure.com/${domainGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`,
+      } as any);
+      mockLocation.href = `https://portal.azure.com/${domainGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+
+      await bookmarkStore.saveCurrentPage();
+
+      // The pre-existing bookmark with domain-string tenantId should be fixed
+      const bookmarks = mockStorage['bookmarks'] as any[];
+      const fixed = bookmarks.find((b: any) => b.id === 'bm-1');
+      expect(fixed.tenantId).toBe(domainGuid);
+      expect(fixed.url).toContain(domainGuid);
+    });
+  });
 });

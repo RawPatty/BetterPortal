@@ -42,12 +42,14 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     await saveTenantMapping(mapping);
   }
 
-  // Backfill existing bookmarks that have null tenantId for this domain
+  // Backfill existing bookmarks that have null or domain-string tenantId for this domain
   const bookmarks = await storageGet('bookmarks');
   if (bookmarks) {
     let updated = false;
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     for (const entry of bookmarks) {
-      if (!entry.tenantId && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
+      const needsFix = !entry.tenantId || !guidRegex.test(entry.tenantId);
+      if (needsFix && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
         entry.tenantId = tenantGuid;
         if (!entry.url.includes(tenantGuid)) {
           entry.url = buildNavigationUrl(entry.url, tenantGuid);
