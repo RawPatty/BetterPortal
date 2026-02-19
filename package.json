@@ -1,6 +1,6 @@
 {
   "name": "betterportal",
-  "version": "1.0.67",
+  "version": "1.0.68",
   "description": "Fast Azure Portal navigation with bookmarks and history tracking",
   "type": "module",
   "license": "MIT",
