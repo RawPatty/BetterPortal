@@ -53,7 +53,7 @@ vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'mock-uuid-' + Math.random().t
 const mockLocation = { href: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123' };
 vi.stubGlobal('window', { location: mockLocation });
 
-import { bookmarkStore } from './bookmarks.store';
+import { bookmarkStore, migrateBookmarks } from './bookmarks.store';
 import { parsePortalUrl, getTenantGuidFromPortal } from './url-parser';
 
 describe('bookmarkStore', () => {
@@ -252,5 +252,109 @@ describe('bookmarkStore', () => {
       expect(fixed.tenantId).toBe(domainGuid);
       expect(fixed.url).toContain(domainGuid);
     });
+  });
+});
+
+describe('migrateBookmarks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+  });
+
+  it('should fix bookmarks with null tenantId when cache has the domain', async () => {
+    const guid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    mockStorage['tenantMapping'] = { 'contoso.onmicrosoft.com': guid };
+    mockStorage['bookmarks'] = [{
+      id: 'bm-null',
+      url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+      tenantId: null,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+      displayName: 'app', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    await migrateBookmarks();
+
+    const bookmarks = mockStorage['bookmarks'] as any[];
+    expect(bookmarks[0].tenantId).toBe(guid);
+    expect(bookmarks[0].url).toContain(guid);
+  });
+
+  it('should fix bookmarks with domain-string tenantId when cache has the domain', async () => {
+    const guid = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    mockStorage['tenantMapping'] = { 'fabrikam.onmicrosoft.com': guid };
+    mockStorage['bookmarks'] = [{
+      id: 'bm-domain',
+      url: 'https://portal.azure.com/#@fabrikam.onmicrosoft.com/resource/subscriptions/sub-2/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+      tenantId: 'fabrikam.onmicrosoft.com',
+      tenantName: 'fabrikam.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-2/resourceGroups/rg/providers/Microsoft.Web/sites/app',
+      displayName: 'app', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    await migrateBookmarks();
+
+    const bookmarks = mockStorage['bookmarks'] as any[];
+    expect(bookmarks[0].tenantId).toBe(guid);
+    expect(bookmarks[0].url).toContain(guid);
+  });
+
+  it('should leave bookmarks with valid GUID tenantId untouched', async () => {
+    const guid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    mockStorage['tenantMapping'] = { 'contoso.onmicrosoft.com': 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' };
+    mockStorage['bookmarks'] = [{
+      id: 'bm-good',
+      url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-3`,
+      tenantId: guid,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-3',
+      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    await migrateBookmarks();
+
+    const bookmarks = mockStorage['bookmarks'] as any[];
+    expect(bookmarks[0].tenantId).toBe(guid); // unchanged
+  });
+
+  it('should leave bookmarks untouched when domain is not in cache', async () => {
+    mockStorage['tenantMapping'] = {};
+    mockStorage['bookmarks'] = [{
+      id: 'bm-unknown',
+      url: 'https://portal.azure.com/#@unknown.onmicrosoft.com/resource/subscriptions/sub-4',
+      tenantId: null,
+      tenantName: 'unknown.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-4',
+      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    await migrateBookmarks();
+
+    const bookmarks = mockStorage['bookmarks'] as any[];
+    expect(bookmarks[0].tenantId).toBeNull(); // still null
+  });
+
+  it('should not write to storage when no bookmarks need fixing', async () => {
+    const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+    mockStorage['tenantMapping'] = {};
+    mockStorage['bookmarks'] = [{
+      id: 'bm-clean',
+      url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-5`,
+      tenantId: guid,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-5',
+      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    const { storageSet } = await import('../../shared/storage');
+    vi.clearAllMocks();
+    await migrateBookmarks();
+
+    expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
   });
 });

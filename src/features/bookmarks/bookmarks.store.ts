@@ -15,6 +15,8 @@ import {
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
 
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Cache for domain → GUID mapping (learned from URLs)
 // This persists so we can look up GUIDs for domains we've seen before
 type TenantMapping = Record<string, string>; // domain -> GUID
@@ -46,9 +48,8 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
   const bookmarks = await storageGet('bookmarks');
   if (bookmarks) {
     let updated = false;
-    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     for (const entry of bookmarks) {
-      const needsFix = !entry.tenantId || !guidRegex.test(entry.tenantId);
+      const needsFix = !entry.tenantId || !GUID_REGEX.test(entry.tenantId);
       if (needsFix && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
         entry.tenantId = tenantGuid;
         if (!entry.url.includes(tenantGuid)) {
@@ -59,7 +60,7 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     }
     if (updated) {
       await storageSet('bookmarks', bookmarks);
-      console.log('[BetterPortal] Backfilled null tenantIds for domain:', tenantDomain);
+      console.log('[BetterPortal] Backfilled missing or invalid tenantIds for domain:', tenantDomain);
     }
   }
 }
@@ -72,6 +73,43 @@ export async function lookupTenantGuid(tenantDomain: string): Promise<string | n
 
   const mapping = await getTenantMapping();
   return mapping[tenantDomain] || null;
+}
+
+/**
+ * Startup migration: backfill tenantId GUIDs for bookmarks saved before GUID storage was implemented.
+ * Handles both null tenantId and old domain-string tenantId values.
+ * Uses cached tenantMapping — bookmarks for unknown domains are left unchanged.
+ */
+export async function migrateBookmarks(): Promise<void> {
+  const bookmarks = await storageGet('bookmarks');
+  if (!bookmarks || bookmarks.length === 0) return;
+
+  const mapping = await getTenantMapping();
+  if (Object.keys(mapping).length === 0) return;
+
+  let updated = false;
+  for (const bookmark of bookmarks) {
+    const needsFix = !bookmark.tenantId || !GUID_REGEX.test(bookmark.tenantId);
+    if (!needsFix) continue;
+
+    const domain = bookmark.tenantName?.toLowerCase();
+    if (!domain) continue;
+
+    const guid = mapping[domain];
+    if (!guid) continue;
+
+    bookmark.tenantId = guid;
+    if (!bookmark.url.includes(guid)) {
+      bookmark.url = buildNavigationUrl(bookmark.url, guid);
+    }
+    updated = true;
+    console.log('[BetterPortal] Migrated bookmark:', bookmark.id, 'domain:', domain, '-> GUID:', guid);
+  }
+
+  if (updated) {
+    await storageSet('bookmarks', bookmarks);
+    console.log('[BetterPortal] Bookmark migration complete');
+  }
 }
 
 export const bookmarkStore = {
@@ -145,7 +183,7 @@ export const bookmarkStore = {
     const domName = getResourceNameFromDOM();
 
     // Check if URL resource name looks like a GUID (subscriptions use GUIDs, not friendly names)
-    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlResourceName);
+    const isGuid = GUID_REGEX.test(urlResourceName);
 
     // Use URL-extracted display name as primary (always correct, includes hierarchy)
     // Prefer DOM name when:
@@ -178,14 +216,13 @@ export const bookmarkStore = {
     // 4. null - if no GUID found, don't store domain as tenantId
 
     const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
-    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // Determine effective tenant ID for navigation - MUST be a GUID or null
     // IMPORTANT: Only trust GUID from URL path. Cache and MSAL tokens are unreliable
     // because MSAL caches tokens for ALL tenants, not just the current one.
     let effectiveTenantId: string | null = null;
 
-    if (parsed.tenantId && guidRegex.test(parsed.tenantId)) {
+    if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
       // URL has GUID in path - this is the ONLY reliable source
       effectiveTenantId = parsed.tenantId;
 
