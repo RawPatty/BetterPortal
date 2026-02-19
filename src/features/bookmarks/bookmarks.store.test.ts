@@ -357,4 +357,25 @@ describe('migrateBookmarks', () => {
 
     expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
   });
+
+  it('should not write to storage when all bookmarks already have valid GUIDs', async () => {
+    const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+    // Non-empty mapping so we don't hit the early-exit guard
+    mockStorage['tenantMapping'] = { 'contoso.onmicrosoft.com': 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' };
+    mockStorage['bookmarks'] = [{
+      id: 'bm-clean2',
+      url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-6`,
+      tenantId: guid,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-6',
+      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    const { storageSet } = await import('../../shared/storage');
+    vi.clearAllMocks();
+    await migrateBookmarks();
+
+    expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
+  });
 });
