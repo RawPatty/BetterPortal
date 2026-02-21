@@ -15,10 +15,30 @@
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
+  import { buildNavigationUrl } from '../bookmarks/url-parser';
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
   let showSettings = false;
+
+  // Copy state
+  let copiedItemId: string | null = null;
+  let copiedTenantKey: string | null = null;
+
+  async function copyItemUrl(item: any, event: MouseEvent) {
+    event.stopPropagation();
+    const url = item.tenantId ? buildNavigationUrl(item.url, item.tenantId) : item.url;
+    await navigator.clipboard.writeText(url);
+    copiedItemId = item.id;
+    setTimeout(() => { copiedItemId = null; }, 1500);
+  }
+
+  async function copyTenantGuid(tenantKey: string, guid: string, event: MouseEvent) {
+    event.stopPropagation();
+    await navigator.clipboard.writeText(guid);
+    copiedTenantKey = tenantKey;
+    setTimeout(() => { copiedTenantKey = null; }, 1500);
+  }
 
   // Inline rename state
   let editingItemId: string | null = null;
@@ -376,6 +396,7 @@
           </div>
         {:else}
           {#each [...$itemsByTenant] as [tenantId, group], groupIndex}
+            {@const tenantGuid = group.items.find(i => i.tenantId)?.tenantId ?? null}
             <div class="bp-group" class:bp-group--first={groupIndex === 0}>
               <div class="bp-group-header">
                 <div class="bp-group-header-left">
@@ -397,7 +418,24 @@
                     <span class="bp-tenant-name bp-tenant-name--editable" on:click={() => startEditTenant(tenantId, group.displayName)}>{group.displayName}</span>
                   {/if}
                 </div>
-                <span class="bp-tenant-count">{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span>
+                <div class="bp-group-header-right">
+                  <span class="bp-tenant-count">{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span>
+                  {#if tenantGuid}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <button
+                      class="bp-copy-btn"
+                      class:bp-copy-btn--copied={copiedTenantKey === tenantId}
+                      title={copiedTenantKey === tenantId ? 'Copied!' : 'Copy directory GUID'}
+                      on:click={(e) => copyTenantGuid(tenantId, tenantGuid, e)}
+                    >
+                      {#if copiedTenantKey === tenantId}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      {:else}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      {/if}
+                    </button>
+                  {/if}
+                </div>
               </div>
               {#each group.items as item, itemIndex}
                 {@const flatIndex = flatItems.findIndex(fi => fi.id === item.id)}
@@ -443,6 +481,19 @@
                   {#if 'isStale' in item && item.isStale}
                     <span class="bp-item-badge bp-item-badge--stale" title="Resource may be unavailable">!</span>
                   {/if}
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <button
+                    class="bp-copy-btn"
+                    class:bp-copy-btn--copied={copiedItemId === item.id}
+                    title={copiedItemId === item.id ? 'Copied!' : (item.tenantId ? 'Copy URL' : 'Copy URL (GUID unavailable — may not switch directories)')}
+                    on:click={(e) => copyItemUrl(item, e)}
+                  >
+                    {#if copiedItemId === item.id}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    {:else}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/if}
+                  </button>
                 </div>
               {/each}
             </div>
@@ -647,10 +698,62 @@
     min-width: 0;
   }
 
+  .bp-group-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .bp-tenant-count {
     font-size: 11px;
     color: var(--bp-text-secondary, #666);
     font-weight: 400;
+  }
+
+  .bp-copy-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--bp-text-secondary, #666);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+    pointer-events: auto;
+  }
+
+  .bp-copy-btn:hover {
+    background: var(--bp-bg-secondary, rgba(0, 0, 0, 0.06));
+    color: var(--bp-accent, #0078d4);
+  }
+
+  .bp-copy-btn--copied {
+    color: #107c10;
+    opacity: 1 !important;
+  }
+
+  .bp-item:hover .bp-copy-btn,
+  .bp-group-header:hover .bp-copy-btn {
+    opacity: 1;
+  }
+
+  .bp-item--selected .bp-copy-btn {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .bp-item--selected .bp-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+  }
+
+  .bp-item--selected .bp-copy-btn--copied {
+    color: #8be08b;
   }
 
   .bp-item {
