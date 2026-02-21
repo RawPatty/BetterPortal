@@ -50,7 +50,7 @@ vi.mock('../history/history.store', () => ({
   },
 }));
 
-import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, itemsByTenant } from './overlay.store';
+import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, currentDirectoryDisplay, itemsByTenant } from './overlay.store';
 import { storageGet, storageSet } from '../../shared/storage';
 import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
@@ -394,6 +394,37 @@ describe('currentDirectory store', () => {
   });
 });
 
+describe('currentDirectoryDisplay', () => {
+  afterEach(() => {
+    currentDirectory.set({ domain: null, guid: null });
+    tenantAliases.set({});
+  });
+
+  it('returns the tenant alias when the current directory has been renamed', () => {
+    currentDirectory.set({ domain: 'contoso.onmicrosoft.com', guid: null });
+    tenantAliases.set({ 'contoso.onmicrosoft.com': 'My Company' });
+
+    const display = get(currentDirectoryDisplay);
+    expect(display.alias).toBe('My Company');
+    expect(display.domain).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('returns null alias when the current directory has no alias', () => {
+    currentDirectory.set({ domain: 'contoso.onmicrosoft.com', guid: null });
+    tenantAliases.set({});
+
+    expect(get(currentDirectoryDisplay).alias).toBeNull();
+  });
+
+  it('returns null alias when currentDirectory domain is null', () => {
+    currentDirectory.set({ domain: null, guid: null });
+    tenantAliases.set({ 'contoso.onmicrosoft.com': 'My Company' });
+
+    expect(get(currentDirectoryDisplay).alias).toBeNull();
+  });
+
+});
+
 describe('itemsByTenant grouping', () => {
   beforeEach(() => {
     bookmarks.set([]);
@@ -452,5 +483,42 @@ describe('itemsByTenant grouping', () => {
     const group = groups.get('contoso.onmicrosoft.com')!;
     expect(group.tenantName).toBe('contoso.onmicrosoft.com');
     expect(group.displayName).toBe('Renamed');
+  });
+
+  it('sorts current directory group to the top even when it was added last', () => {
+    // fabrikam added first, contoso added second — contoso is current directory
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: 'contoso.onmicrosoft.com', guid: null });
+
+    const keys = [...get(itemsByTenant).keys()];
+    expect(keys[0]).toBe('contoso.onmicrosoft.com');
+    expect(keys[1]).toBe('fabrikam.onmicrosoft.com');
+  });
+
+  it('leaves order unchanged when currentDirectory does not match any group', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: 'other.onmicrosoft.com', guid: null });
+
+    const keys = [...get(itemsByTenant).keys()];
+    expect(keys[0]).toBe('fabrikam.onmicrosoft.com');
+    expect(keys[1]).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('leaves order unchanged when currentDirectory domain is null', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: null, guid: null });
+
+    const keys = [...get(itemsByTenant).keys()];
+    expect(keys[0]).toBe('fabrikam.onmicrosoft.com');
+    expect(keys[1]).toBe('contoso.onmicrosoft.com');
   });
 });

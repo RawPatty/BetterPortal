@@ -11,6 +11,7 @@
     overlayActions,
     settings,
     currentDirectory,
+    currentDirectoryDisplay,
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
@@ -350,13 +351,14 @@
           />
           <span class="bp-search-hint">/</span>
         </div>
-        {#if $currentDirectory.domain || $currentDirectory.guid}
+        {#if $currentDirectoryDisplay.domain}
           <div class="bp-current-dir">
             <span class="bp-current-dir-label">Current directory:</span>
-            <span class="bp-current-dir-domain">{$currentDirectory.domain ?? '—'}</span>
-            {#if $currentDirectory.guid}
-              <span class="bp-current-dir-sep">·</span>
-              <span class="bp-current-dir-guid">{$currentDirectory.guid}</span>
+            {#if $currentDirectoryDisplay.alias}
+              <span class="bp-current-dir-domain">{$currentDirectoryDisplay.alias}</span>
+              <span class="bp-current-dir-formal">({$currentDirectoryDisplay.domain})</span>
+            {:else}
+              <span class="bp-current-dir-domain">{$currentDirectoryDisplay.domain}</span>
             {/if}
           </div>
         {/if}
@@ -760,17 +762,11 @@
     flex-shrink: 0;
   }
 
-  .bp-current-dir-sep {
+  .bp-current-dir-formal {
+    font-size: 10px;
+    color: var(--bp-text-secondary, #666);
     flex-shrink: 0;
   }
 
-  .bp-current-dir-guid {
-    font-family: monospace;
-    font-size: 10px;
-    color: var(--bp-text-secondary, #666);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 
 </style>

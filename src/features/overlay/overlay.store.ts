@@ -38,6 +38,15 @@ export const tenantAliases = writable<Record<string, string>>({});
 // Store for the current Azure Portal directory (populated on each refresh)
 export const currentDirectory = writable<{ domain: string | null; guid: string | null }>({ domain: null, guid: null });
 
+// Derived store: current directory with alias resolved from tenantAliases
+export const currentDirectoryDisplay = derived(
+  [currentDirectory, tenantAliases],
+  ([$currentDirectory, $tenantAliases]) => ({
+    domain: $currentDirectory.domain,
+    alias: $currentDirectory.domain ? ($tenantAliases[$currentDirectory.domain] ?? null) : null,
+  })
+);
+
 // Combined items for display
 export type DisplayItem = (Bookmark | HistoryEntry) & { type: 'bookmark' | 'history' };
 
@@ -116,8 +125,8 @@ export const filteredItems = derived(
 
 // Derived store for items grouped by tenant (group by tenantName for display, not tenantId)
 export const itemsByTenant = derived(
-  [filteredItems, tenantAliases],
-  ([$items, $tenantAliases]) => {
+  [filteredItems, tenantAliases, currentDirectory],
+  ([$items, $tenantAliases, $currentDirectory]) => {
     const grouped = new Map<string, { tenantName: string; displayName: string; items: DisplayItem[] }>();
 
     for (const item of $items) {
@@ -132,6 +141,20 @@ export const itemsByTenant = derived(
         });
       }
       grouped.get(key)!.items.push(item);
+    }
+
+    // Sort current directory group to the top
+    if ($currentDirectory.domain) {
+      const currentDomain = $currentDirectory.domain.toLowerCase();
+      const entries = [...grouped.entries()];
+      entries.sort(([keyA], [keyB]) => {
+        const isCurrentA = keyA?.toLowerCase() === currentDomain;
+        const isCurrentB = keyB?.toLowerCase() === currentDomain;
+        if (isCurrentA) return -1;
+        if (isCurrentB) return 1;
+        return 0;
+      });
+      return new Map(entries);
     }
 
     return grouped;

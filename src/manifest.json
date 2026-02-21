@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BetterPortal",
   "description": "Fast Azure Portal navigation with bookmarks and history tracking",
-  "version": "1.0.70",
+  "version": "1.0.71",
   "icons": {
     "16": "src/icons/icon16.png",
     "48": "src/icons/icon48.png",
