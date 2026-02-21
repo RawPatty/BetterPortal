@@ -52,8 +52,8 @@ export type DisplayItem = (Bookmark | HistoryEntry) & { type: 'bookmark' | 'hist
 
 // Derived store for filtered items based on search
 export const filteredItems = derived(
-  [bookmarks, history, searchQuery, overlayMode, tenantAliases],
-  ([$bookmarks, $history, $searchQuery, $mode, $tenantAliases]) => {
+  [bookmarks, history, searchQuery, overlayMode, tenantAliases, currentDirectory],
+  ([$bookmarks, $history, $searchQuery, $mode, $tenantAliases, $currentDirectory]) => {
     let items: DisplayItem[] = [];
 
     // Track seen resources to deduplicate (resourceId:tenantId)
@@ -100,23 +100,19 @@ export const filteredItems = derived(
       });
     }
 
-    // Sort items to match visual display order (grouped by tenant)
-    // This ensures arrow key navigation follows the visual order
-    const tenantOrder = new Map<string, number>();
-    let orderIndex = 0;
-    for (const item of items) {
-      const tenantKey = item.tenantName || item.tenantId;
-      if (!tenantOrder.has(tenantKey)) {
-        tenantOrder.set(tenantKey, orderIndex++);
-      }
-    }
+    // Sort items to match visual display order (grouped by tenant, current directory first)
+    // This ensures arrow key navigation follows the visual order shown in itemsByTenant
+    const currentDomain = $currentDirectory.domain?.toLowerCase() ?? null;
 
     items.sort((a, b) => {
-      const tenantA = a.tenantName || a.tenantId;
-      const tenantB = b.tenantName || b.tenantId;
-      const orderA = tenantOrder.get(tenantA) ?? 0;
-      const orderB = tenantOrder.get(tenantB) ?? 0;
-      return orderA - orderB;
+      const tenantA = (a.tenantName || a.tenantId)?.toLowerCase() ?? '';
+      const tenantB = (b.tenantName || b.tenantId)?.toLowerCase() ?? '';
+      const isCurrentA = currentDomain !== null && tenantA === currentDomain;
+      const isCurrentB = currentDomain !== null && tenantB === currentDomain;
+      if (isCurrentA && !isCurrentB) return -1;
+      if (isCurrentB && !isCurrentA) return 1;
+      // Within the same tenant, preserve original order (stable sort)
+      return 0;
     });
 
     return items;

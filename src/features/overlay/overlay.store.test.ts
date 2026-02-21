@@ -522,3 +522,74 @@ describe('itemsByTenant grouping', () => {
     expect(keys[1]).toBe('contoso.onmicrosoft.com');
   });
 });
+
+describe('filteredItems ordering consistency with visual display', () => {
+  beforeEach(() => {
+    bookmarks.set([]);
+    tenantAliases.set({});
+    currentDirectory.set({ domain: null, guid: null });
+    searchQuery.set('');
+  });
+
+  afterEach(() => {
+    bookmarks.set([]);
+    tenantAliases.set({});
+    currentDirectory.set({ domain: null, guid: null });
+    searchQuery.set('');
+  });
+
+  it('filteredItems puts current directory tenant first to match visual display order', () => {
+    // fabrikam is first in bookmarks storage, contoso is second — but contoso is current directory
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: 'contoso.onmicrosoft.com', guid: null });
+
+    // itemsByTenant correctly puts contoso first (current directory)
+    const tenantKeys = [...get(itemsByTenant).keys()];
+    expect(tenantKeys[0]).toBe('contoso.onmicrosoft.com');
+
+    // filteredItems must match that same order so keyboard navigation aligns with visuals
+    const items = get(filteredItems);
+    expect(items[0].tenantName).toBe('contoso.onmicrosoft.com');
+    expect(items[1].tenantName).toBe('fabrikam.onmicrosoft.com');
+  });
+
+  it('filteredItems puts current directory tenant first when search is active', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: 'contoso.onmicrosoft.com', guid: null });
+    searchQuery.set('rg'); // both items match
+
+    const items = get(filteredItems);
+    expect(items[0].tenantName).toBe('contoso.onmicrosoft.com');
+    expect(items[1].tenantName).toBe('fabrikam.onmicrosoft.com');
+  });
+
+  it('filteredItems order is unchanged when current directory does not match any tenant', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: 'other.onmicrosoft.com', guid: null });
+
+    const items = get(filteredItems);
+    expect(items[0].tenantName).toBe('fabrikam.onmicrosoft.com');
+    expect(items[1].tenantName).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('filteredItems order is unchanged when currentDirectory domain is null', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'fabrikam.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+    currentDirectory.set({ domain: null, guid: null });
+
+    const items = get(filteredItems);
+    expect(items[0].tenantName).toBe('fabrikam.onmicrosoft.com');
+    expect(items[1].tenantName).toBe('contoso.onmicrosoft.com');
+  });
+});
