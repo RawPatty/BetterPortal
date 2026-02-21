@@ -340,8 +340,8 @@ function extractTenantFromJwt(token: string): string | null {
 }
 
 /**
- * Inject a script into the page context to extract tenant GUID from window objects
- * Content scripts can't access page's window objects directly due to isolation
+ * Request the tenant GUID from the MAIN world content script (page-context.ts).
+ * Uses a custom DOM event which synchronously crosses the isolated/main world boundary.
  *
  * IMPORTANT: Always re-extract - don't cache, as user may switch tenants!
  */
@@ -351,55 +351,11 @@ function extractTenantFromPageContext(): string | null {
   // Always clear previous value and re-extract (user may have switched tenants)
   document.documentElement.removeAttribute(ATTR_NAME);
 
-  // Inject script into page context to extract tenant GUID
-  const script = document.createElement('script');
-  script.textContent = `
-    (function() {
-      var guid = null;
-      var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Ask the MAIN world script to extract the GUID and write it to the DOM attribute.
+  // Custom events dispatched on document are received synchronously by listeners in both worlds.
+  document.dispatchEvent(new CustomEvent('betterportal:get-tenant'));
 
-      // Try various window objects where Azure Portal stores tenant info
-      var paths = [
-        function() { return window.Portal && window.Portal.tenant && window.Portal.tenant.id; },
-        function() { return window.Portal && window.Portal.TenantId; },
-        function() { return window.Portal && window.Portal.tenantId; },
-        function() { return window.Portal && window.Portal.Environment && window.Portal.Environment.tenantId; },
-        function() { return window.Portal && window.Portal.Environment && window.Portal.Environment.directoryId; },
-        function() { return window.fx && window.fx.environment && window.fx.environment.tenantId; },
-        function() { return window.fx && window.fx.environment && window.fx.environment.directoryId; },
-        function() { return window.MsPortalFx && window.MsPortalFx.Base && window.MsPortalFx.Base.Security &&
-                     typeof window.MsPortalFx.Base.Security.getTenantId === 'function' &&
-                     window.MsPortalFx.Base.Security.getTenantId(); },
-        function() { return window.MsPortalFx && window.MsPortalFx.environment && window.MsPortalFx.environment.tenantId; },
-        function() { return window.__portal__ && window.__portal__.tenantId; },
-        function() { return window.portalEnvironment && window.portalEnvironment.tenantId; },
-        function() { return window.Portal && window.Portal.getContext && typeof window.Portal.getContext === 'function' &&
-                     window.Portal.getContext() && window.Portal.getContext().tenantId; },
-      ];
-
-      for (var i = 0; i < paths.length; i++) {
-        try {
-          var val = paths[i]();
-          if (val && typeof val === 'string' && guidRegex.test(val)) {
-            guid = val;
-            break;
-          }
-        } catch (e) {}
-      }
-
-      if (guid) {
-        document.documentElement.setAttribute('${ATTR_NAME}', guid);
-        console.log('[BetterPortal] Injected script found tenant GUID:', guid);
-      } else {
-        console.log('[BetterPortal] Injected script could not find tenant GUID');
-      }
-    })();
-  `;
-
-  document.documentElement.appendChild(script);
-  script.remove();
-
-  // Read the result
+  // Read the result written by page-context.ts (MAIN world)
   const result = document.documentElement.getAttribute(ATTR_NAME);
   if (result) {
     console.log('[BetterPortal] Got tenant GUID from page context:', result);

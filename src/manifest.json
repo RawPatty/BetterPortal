@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BetterPortal",
   "description": "Fast Azure Portal navigation with bookmarks and history tracking",
-  "version": "1.0.69",
+  "version": "1.0.70",
   "icons": {
     "16": "src/icons/icon16.png",
     "48": "src/icons/icon48.png",
@@ -24,6 +24,12 @@
       "matches": ["*://portal.azure.com/*"],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://portal.azure.com/*"],
+      "js": ["src/content/page-context.ts"],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ],
   "action": {
