@@ -10,6 +10,7 @@
     filteredItems,
     overlayActions,
     settings,
+    currentDirectory,
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
@@ -349,6 +350,16 @@
           />
           <span class="bp-search-hint">/</span>
         </div>
+        {#if $currentDirectory.domain || $currentDirectory.guid}
+          <div class="bp-current-dir">
+            <span class="bp-current-dir-label">Current directory:</span>
+            <span class="bp-current-dir-domain">{$currentDirectory.domain ?? '—'}</span>
+            {#if $currentDirectory.guid}
+              <span class="bp-current-dir-sep">·</span>
+              <span class="bp-current-dir-guid">{$currentDirectory.guid}</span>
+            {/if}
+          </div>
+        {/if}
       </header>
 
       <div class="bp-list" bind:this={listRef}>
@@ -722,6 +733,44 @@
     border: 1px solid var(--bp-border, #e1e1e1);
     border-radius: 3px;
     margin-right: 2px;
+  }
+
+  .bp-current-dir {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--bp-bg-secondary, #f5f5f5);
+    border: 1px solid var(--bp-border, #e1e1e1);
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+    overflow: hidden;
+  }
+
+  .bp-current-dir-label {
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .bp-current-dir-domain {
+    color: var(--bp-text, #323130);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .bp-current-dir-sep {
+    flex-shrink: 0;
+  }
+
+  .bp-current-dir-guid {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--bp-text-secondary, #666);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
 </style>

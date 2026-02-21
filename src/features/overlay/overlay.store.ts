@@ -35,6 +35,9 @@ export const settings = writable<Settings | null>(null);
 // Store for tenant aliases (tenantName domain → user alias)
 export const tenantAliases = writable<Record<string, string>>({});
 
+// Store for the current Azure Portal directory (populated on each refresh)
+export const currentDirectory = writable<{ domain: string | null; guid: string | null }>({ domain: null, guid: null });
+
 // Combined items for display
 export type DisplayItem = (Bookmark | HistoryEntry) & { type: 'bookmark' | 'history' };
 
@@ -169,6 +172,7 @@ export const overlayActions = {
    * Refresh data from storage
    */
   async refresh() {
+    currentDirectory.set(getCurrentDirectoryInfo());
     try {
       const [bookmarkData, settingsData, tenantAliasData] = await Promise.all([
         bookmarkStore.getAll(),

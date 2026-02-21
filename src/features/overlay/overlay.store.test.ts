@@ -50,8 +50,9 @@ vi.mock('../history/history.store', () => ({
   },
 }));
 
-import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery } from './overlay.store';
+import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, itemsByTenant } from './overlay.store';
 import { storageGet, storageSet } from '../../shared/storage';
+import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
 
 describe('overlayActions', () => {
@@ -295,5 +296,161 @@ describe('overlayActions', () => {
       searchQuery.set('');
       bookmarks.set([]);
     });
+  });
+});
+
+// Helper to build a minimal bookmark for grouping tests
+function makeBookmark(id: string, tenantName: string, tenantId: string | null, resourceSuffix: string) {
+  return {
+    id,
+    url: `https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/${resourceSuffix}`,
+    tenantId,
+    tenantName,
+    resourceId: `/subscriptions/sub-1/resourceGroups/${resourceSuffix}`,
+    displayName: resourceSuffix,
+    alias: null as string | null,
+    stateDepth: 'full' as const,
+    createdAt: 0,
+    lastAccessed: 0,
+    accessCount: 0,
+    isStale: false,
+  };
+}
+
+describe('currentDirectory store', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+    mockStorage['bookmarks'] = [];
+    // Default mock: no GUID in URL
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({ domain: 'test.onmicrosoft.com', guid: null });
+  });
+
+  it('is populated with domain from getCurrentDirectoryInfo after refresh', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({ domain: 'contoso.onmicrosoft.com', guid: null });
+
+    await overlayActions.refresh();
+
+    const dir = get(currentDirectory);
+    expect(dir.domain).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('is populated with GUID from getCurrentDirectoryInfo after refresh', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({
+      domain: 'contoso.onmicrosoft.com',
+      guid: 'aabbccdd-1234-1234-1234-aabbccddeeff',
+    });
+
+    await overlayActions.refresh();
+
+    const dir = get(currentDirectory);
+    expect(dir.guid).toBe('aabbccdd-1234-1234-1234-aabbccddeeff');
+  });
+
+  it('preserves GUID even when the current tenant has a display alias', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({
+      domain: 'contoso.onmicrosoft.com',
+      guid: 'aabbccdd-1234-1234-1234-aabbccddeeff',
+    });
+    tenantAliases.set({ 'contoso.onmicrosoft.com': 'My Company (renamed)' });
+
+    await overlayActions.refresh();
+
+    const dir = get(currentDirectory);
+    // GUID must be present regardless of the alias
+    expect(dir.guid).toBe('aabbccdd-1234-1234-1234-aabbccddeeff');
+    expect(dir.domain).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('has null GUID when the current URL has no tenant GUID in path', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({ domain: 'contoso.onmicrosoft.com', guid: null });
+
+    await overlayActions.refresh();
+
+    const dir = get(currentDirectory);
+    expect(dir.guid).toBeNull();
+  });
+
+  it('has null domain when the current URL has no tenant hash', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({ domain: null, guid: null });
+
+    await overlayActions.refresh();
+
+    const dir = get(currentDirectory);
+    expect(dir.domain).toBeNull();
+  });
+
+  it('updates currentDirectory when overlay is opened via open()', async () => {
+    vi.mocked(getCurrentDirectoryInfo).mockReturnValue({
+      domain: 'fabrikam.onmicrosoft.com',
+      guid: '11111111-2222-3333-4444-555555555555',
+    });
+
+    await overlayActions.open();
+
+    const dir = get(currentDirectory);
+    expect(dir.domain).toBe('fabrikam.onmicrosoft.com');
+    expect(dir.guid).toBe('11111111-2222-3333-4444-555555555555');
+  });
+});
+
+describe('itemsByTenant grouping', () => {
+  beforeEach(() => {
+    bookmarks.set([]);
+    tenantAliases.set({});
+  });
+
+  afterEach(() => {
+    bookmarks.set([]);
+    tenantAliases.set({});
+  });
+
+  it('groups items with the same tenantName into one group regardless of tenantId', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', null, 'rg-b'),
+    ]);
+
+    const groups = get(itemsByTenant);
+    expect(groups.size).toBe(1);
+    expect(groups.get('contoso.onmicrosoft.com')!.items).toHaveLength(2);
+  });
+
+  it('creates separate groups for items with different tenantNames', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'fabrikam.onmicrosoft.com', 'guid-2', 'rg-b'),
+    ]);
+
+    const groups = get(itemsByTenant);
+    expect(groups.size).toBe(2);
+    expect(groups.get('contoso.onmicrosoft.com')!.items).toHaveLength(1);
+    expect(groups.get('fabrikam.onmicrosoft.com')!.items).toHaveLength(1);
+  });
+
+  it('uses tenant alias as displayName when an alias is set', () => {
+    bookmarks.set([makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a')]);
+    tenantAliases.set({ 'contoso.onmicrosoft.com': 'Contoso Corp' });
+
+    const groups = get(itemsByTenant);
+    expect(groups.get('contoso.onmicrosoft.com')!.displayName).toBe('Contoso Corp');
+  });
+
+  it('uses tenantName as displayName when no alias is set', () => {
+    bookmarks.set([makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a')]);
+    tenantAliases.set({});
+
+    const groups = get(itemsByTenant);
+    expect(groups.get('contoso.onmicrosoft.com')!.displayName).toBe('contoso.onmicrosoft.com');
+  });
+
+  it('does not change tenantName when alias is set (alias only affects displayName)', () => {
+    bookmarks.set([makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a')]);
+    tenantAliases.set({ 'contoso.onmicrosoft.com': 'Renamed' });
+
+    const groups = get(itemsByTenant);
+    const group = groups.get('contoso.onmicrosoft.com')!;
+    expect(group.tenantName).toBe('contoso.onmicrosoft.com');
+    expect(group.displayName).toBe('Renamed');
   });
 });
