@@ -3,10 +3,16 @@ import type { HistoryEntry } from '../../shared/types';
 
 // Mock chrome.storage
 const mockStorage: Record<string, any> = {};
+const mockSyncStorage: Record<string, any> = {};
 vi.mock('../../shared/storage', () => ({
   storageGet: vi.fn((key: string) => Promise.resolve(mockStorage[key])),
   storageSet: vi.fn((key: string, value: any) => {
     mockStorage[key] = value;
+    return Promise.resolve();
+  }),
+  storageSyncGet: vi.fn((key: string) => Promise.resolve(mockSyncStorage[key] ?? null)),
+  storageSyncSet: vi.fn((key: string, value: any) => {
+    mockSyncStorage[key] = value;
     return Promise.resolve();
   }),
 }));
@@ -51,7 +57,7 @@ vi.mock('../history/history.store', () => ({
 }));
 
 import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, currentDirectoryDisplay, itemsByTenant } from './overlay.store';
-import { storageGet, storageSet } from '../../shared/storage';
+import { storageGet, storageSet, storageSyncSet } from '../../shared/storage';
 import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
 
@@ -60,6 +66,7 @@ describe('overlayActions', () => {
     vi.clearAllMocks();
     // Clear mock storage
     Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+    Object.keys(mockSyncStorage).forEach(key => delete mockSyncStorage[key]);
     mockStorage['bookmarks'] = [];
   });
 
@@ -202,7 +209,7 @@ describe('overlayActions', () => {
     it('should save a tenant alias', async () => {
       await overlayActions.renameTenant('contoso.onmicrosoft.com', 'Contoso Production');
 
-      expect(storageSet).toHaveBeenCalledWith('tenantAliases', {
+      expect(storageSyncSet).toHaveBeenCalledWith('tenantAliases', {
         'contoso.onmicrosoft.com': 'Contoso Production',
       });
       expect(get(tenantAliases)).toEqual({
@@ -216,7 +223,7 @@ describe('overlayActions', () => {
 
       await overlayActions.renameTenant('contoso.onmicrosoft.com', null);
 
-      expect(storageSet).toHaveBeenCalledWith('tenantAliases', {});
+      expect(storageSyncSet).toHaveBeenCalledWith('tenantAliases', {});
       expect(get(tenantAliases)).toEqual({});
     });
 

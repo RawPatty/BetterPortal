@@ -31,7 +31,46 @@ Object.defineProperty(globalThis, 'chrome', {
   writable: true,
 });
 
-import { storageSyncGet, storageSyncSet, storageSyncRemove } from './storage';
+import { storageSyncGet, storageSyncSet, storageSyncRemove, migrateSettingsToSync } from './storage';
+
+describe('migrateSettingsToSync', () => {
+  beforeEach(() => {
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+    Object.keys(mockLocalStorage).forEach(k => delete mockLocalStorage[k]);
+    vi.clearAllMocks();
+  });
+
+  it('copies settings from local to sync when sync is empty', async () => {
+    const localSettings = { theme: 'dark', historyEnabled: true };
+    mockLocalStorage['settings'] = localSettings;
+
+    await migrateSettingsToSync();
+
+    expect(mockSyncStorage['settings']).toEqual(localSettings);
+    expect(mockLocalStorage['settings']).toBeUndefined();
+  });
+
+  it('copies tenantAliases from local to sync when sync is empty', async () => {
+    mockLocalStorage['tenantAliases'] = { 'contoso.onmicrosoft.com': 'Contoso' };
+
+    await migrateSettingsToSync();
+
+    expect(mockSyncStorage['tenantAliases']).toEqual({ 'contoso.onmicrosoft.com': 'Contoso' });
+    expect(mockLocalStorage['tenantAliases']).toBeUndefined();
+  });
+
+  it('does not overwrite sync data if it already exists', async () => {
+    const syncSettings = { theme: 'light' };
+    const localSettings = { theme: 'dark' };
+    mockSyncStorage['settings'] = syncSettings;
+    mockLocalStorage['settings'] = localSettings;
+
+    await migrateSettingsToSync();
+
+    // Sync data preserved
+    expect(mockSyncStorage['settings']).toEqual(syncSettings);
+  });
+});
 
 describe('sync storage primitives', () => {
   beforeEach(() => {

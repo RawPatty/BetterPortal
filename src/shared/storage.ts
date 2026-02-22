@@ -144,6 +144,32 @@ export async function storageSyncRemove(key: StorageKey): Promise<void> {
 }
 
 /**
+ * One-time migration: move settings and tenantAliases from local to sync.
+ * Safe to call on every startup — skips migration if sync already has data.
+ */
+export async function migrateSettingsToSync(): Promise<void> {
+  // Migrate settings
+  const syncSettings = await storageSyncGet('settings');
+  if (!syncSettings) {
+    const localSettings = await storageGet('settings');
+    if (localSettings) {
+      await storageSyncSet('settings', localSettings);
+      await storageRemove('settings');
+    }
+  }
+
+  // Migrate tenantAliases
+  const syncAliases = await storageSyncGet('tenantAliases');
+  if (!syncAliases) {
+    const localAliases = await storageGet('tenantAliases');
+    if (localAliases) {
+      await storageSyncSet('tenantAliases', localAliases);
+      await storageRemove('tenantAliases');
+    }
+  }
+}
+
+/**
  * Get multiple values from Chrome storage
  */
 export async function storageGetMany<K extends StorageKey>(
@@ -252,6 +278,7 @@ async function migrateSchema(
  * Initialize storage with defaults if needed
  */
 export async function initializeStorage(): Promise<void> {
+  await migrateSettingsToSync();
   await runMigrations();
 }
 

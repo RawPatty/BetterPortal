@@ -9,7 +9,7 @@ import {
   isSameDirectory,
   buildNavigationUrl,
 } from '../bookmarks/url-parser';
-import { storageGet, storageSet } from '../../shared/storage';
+import { storageSyncGet, storageSyncSet } from '../../shared/storage';
 
 // Store for overlay visibility
 export const isOverlayOpen = writable(false);
@@ -196,7 +196,7 @@ export const overlayActions = {
       const [bookmarkData, settingsData, tenantAliasData] = await Promise.all([
         bookmarkStore.getAll(),
         settingsStore.get(),
-        storageGet('tenantAliases'),
+        storageSyncGet('tenantAliases'),
       ]);
 
       console.log('[BetterPortal] Loaded', bookmarkData.length, 'bookmarks');
@@ -375,7 +375,7 @@ export const overlayActions = {
     } else {
       delete updated[tenantKey];
     }
-    await storageSet('tenantAliases', updated);
+    await storageSyncSet('tenantAliases', updated);
     tenantAliases.set(updated);
   },
 

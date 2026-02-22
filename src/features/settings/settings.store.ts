@@ -1,5 +1,5 @@
 // Settings store for BetterPortal
-import { storageGet, storageSet } from '../../shared/storage';
+import { storageSyncGet, storageSyncSet } from '../../shared/storage';
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/types';
 
 export const settingsStore = {
@@ -7,7 +7,7 @@ export const settingsStore = {
    * Get current settings (with defaults for missing fields)
    */
   async get(): Promise<Settings> {
-    const stored = await storageGet('settings');
+    const stored = await storageSyncGet('settings');
     if (!stored) {
       return { ...DEFAULT_SETTINGS };
     }
@@ -21,7 +21,7 @@ export const settingsStore = {
   async update(partial: Partial<Settings>): Promise<Settings> {
     const current = await this.get();
     const updated = { ...current, ...partial };
-    await storageSet('settings', updated);
+    await storageSyncSet('settings', updated);
     return updated;
   },
 
@@ -29,7 +29,7 @@ export const settingsStore = {
    * Reset settings to defaults
    */
   async reset(): Promise<Settings> {
-    await storageSet('settings', DEFAULT_SETTINGS);
+    await storageSyncSet('settings', DEFAULT_SETTINGS);
     return { ...DEFAULT_SETTINGS };
   },
 
