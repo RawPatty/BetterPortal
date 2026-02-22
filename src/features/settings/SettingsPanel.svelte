@@ -4,6 +4,8 @@
   import { settingsStore } from './settings.store';
   import { DEFAULT_SETTINGS } from '../../shared/types';
   import AboutModal from './AboutModal.svelte';
+  import { migrateBookmarksToSync, migrateBookmarksFromSync, bookmarkStore } from '../bookmarks/bookmarks.store';
+  import { MAX_ITEMS } from '../../shared/constants';
 
   export let isOpen: boolean = false;
 
@@ -13,9 +15,14 @@
   let isRecordingHotkey = false;
   let hotkeyError = '';
   let showAbout = false;
+  let bookmarkCount = 0;
+  let bookmarkSyncMigrating = false;
+  let bookmarkSyncError = '';
 
   onMount(async () => {
     settings = await settingsStore.get();
+    const bm = await bookmarkStore.getAll();
+    bookmarkCount = bm.length;
   });
 
   function close() {
@@ -85,6 +92,27 @@
     if (hotkey.meta) parts.push(isMac ? '⌘' : 'Meta');
     parts.push(hotkey.key);
     return parts.join('+');
+  }
+
+  async function handleBookmarkSyncToggle() {
+    bookmarkSyncMigrating = true;
+    bookmarkSyncError = '';
+    const enabling = settings.bookmarkSyncEnabled;
+
+    try {
+      if (enabling) {
+        await migrateBookmarksToSync();
+      } else {
+        await migrateBookmarksFromSync();
+      }
+      await saveSettings();
+    } catch (e: any) {
+      // Revert the toggle on failure
+      settings.bookmarkSyncEnabled = !enabling;
+      bookmarkSyncError = 'Migration failed. Please try again.';
+    } finally {
+      bookmarkSyncMigrating = false;
+    }
   }
 
   async function handleThemeChange() {
@@ -191,12 +219,6 @@
             </label>
           </div>
           <div class="bp-settings-row">
-            <label>
-              <input type="checkbox" bind:checked={settings.autoBookmark} on:change={saveSettings} />
-              Auto-bookmark visited pages
-            </label>
-          </div>
-          <div class="bp-settings-row">
             <label for="retention">Retention (days)</label>
             <input
               id="retention"
@@ -220,33 +242,34 @@
           </div>
         </section>
 
-        <!-- Diff Section -->
+        <!-- Bookmarks Section -->
         <section class="bp-settings-section">
-          <h3>Diff / Snapshots</h3>
+          <h3>Bookmarks</h3>
           <div class="bp-settings-row">
-            <label for="maxSnapshots">Max snapshots per resource</label>
-            <input
-              id="maxSnapshots"
-              type="number"
-              min="2"
-              max="20"
-              bind:value={settings.maxSnapshotsPerResource}
-              on:change={saveSettings}
-            />
+            <span class="bp-label">
+              {bookmarkCount} / {MAX_ITEMS.BOOKMARKS} bookmarks
+            </span>
           </div>
           <div class="bp-settings-row">
-            <label for="ignoredPaths">Ignored paths (comma-separated)</label>
-            <input
-              id="ignoredPaths"
-              type="text"
-              value={settings.diffIgnoredPaths.join(', ')}
-              on:change={(e) => {
-                settings.diffIgnoredPaths = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
-                saveSettings();
-              }}
-            />
+            <label for="bookmarkSync">
+              <input
+                id="bookmarkSync"
+                type="checkbox"
+                bind:checked={settings.bookmarkSyncEnabled}
+                on:change={handleBookmarkSyncToggle}
+                disabled={bookmarkSyncMigrating}
+              />
+              Sync bookmarks across devices
+            </label>
+            {#if bookmarkSyncMigrating}
+              <span class="bp-sync-status">Migrating…</span>
+            {/if}
           </div>
+          {#if bookmarkSyncError}
+            <div class="bp-error">{bookmarkSyncError}</div>
+          {/if}
         </section>
+
       </div>
 
       <footer class="bp-settings-footer">
@@ -468,5 +491,11 @@
 
   .bp-btn--secondary:hover {
     background: var(--bp-bg-secondary, #f5f5f5);
+  }
+
+  .bp-sync-status {
+    font-size: 12px;
+    color: var(--bp-text-secondary, #666);
+    font-style: italic;
   }
 </style>
