@@ -25,26 +25,6 @@ export const PORTAL_URL_PATTERNS = {
   IS_RESOURCE_PAGE: /portal\.azure\.com.*(\/resource\/|resourceId[=%2F]|#.*\/subscriptions\/|#blade\/|#view\/)/i,
 };
 
-// ARM API endpoints and versions
-export const ARM_API = {
-  BASE_URL: 'https://management.azure.com',
-  DEFAULT_API_VERSION: '2023-07-01',
-
-  // Common resource type API versions
-  API_VERSIONS: {
-    'Microsoft.Web/sites': '2023-01-01',
-    'Microsoft.Storage/storageAccounts': '2023-01-01',
-    'Microsoft.Compute/virtualMachines': '2023-09-01',
-    'Microsoft.KeyVault/vaults': '2023-07-01',
-    'Microsoft.Sql/servers': '2023-05-01-preview',
-    'Microsoft.ContainerRegistry/registries': '2023-07-01',
-    'Microsoft.ContainerService/managedClusters': '2023-10-01',
-  } as Record<string, string>,
-
-  // IAM role assignments API
-  ROLE_ASSIGNMENTS_VERSION: '2022-04-01',
-};
-
 // DOM selectors for Azure Portal
 export const PORTAL_SELECTORS = {
   // Tenant name display
@@ -88,14 +68,5 @@ export const HISTORY_DEBOUNCE_MS = 2000;
 // Maximum items before pruning
 export const MAX_ITEMS = {
   HISTORY: 500,
-  SNAPSHOTS_PER_RESOURCE: 5,
+  BOOKMARKS: 150,
 };
-
-// Diff ignored paths (ARM properties that change frequently)
-export const DEFAULT_IGNORED_PATHS = [
-  'etag',
-  'systemData',
-  'properties.provisioningState',
-  'properties.lastModifiedTimeUtc',
-  'properties.createdTimeUtc',
-];

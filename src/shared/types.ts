@@ -16,6 +16,10 @@ export interface Bookmark {
   isStale: boolean;
 }
 
+export type BookmarkSaveResult =
+  | { success: true; bookmark: Bookmark }
+  | { success: false; reason: 'limit_reached' };
+
 // ============ History ============
 export interface HistoryEntry {
   id: string;
@@ -42,11 +46,11 @@ export interface Settings {
   historyEnabled: boolean;
   historyRetentionDays: number;
   historyMaxEntries: number;
-  autoBookmark: boolean;
   theme: 'light' | 'dark';
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
   lastExportedAt: number | null;
+  bookmarkSyncEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -54,11 +58,11 @@ export const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 20,
-  autoBookmark: false, // Disabled - pages go to history first, user explicitly bookmarks
   theme: 'light',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
   lastExportedAt: null,
+  bookmarkSyncEnabled: false,
 };
 
 // ============ Storage Schema ============
