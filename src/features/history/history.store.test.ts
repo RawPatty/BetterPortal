@@ -49,6 +49,9 @@ vi.mock('../bookmarks/url-parser', () => ({
     }
     return url;
   }),
+  stripTenantGuidFromUrl: vi.fn((url: string) =>
+    url.replace(/portal\.azure\.com\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i, 'portal.azure.com/')
+  ),
 }));
 
 import { historyStore } from './history.store';
@@ -692,8 +695,9 @@ describe('historyStore', () => {
       expect(old2.tenantId).toBeNull();
     });
 
-    it('should update URL with GUID during backfill', async () => {
+    it('should backfill tenantId without modifying url during backfill', async () => {
       const guid = '66666666-6666-6666-6666-666666666666';
+      const originalUrl = 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/url-test';
       mockStorage['history'] = [
         {
           id: 'url-test',
@@ -703,7 +707,7 @@ describe('historyStore', () => {
           displayName: 'URL Test App',
           visitedAt: Date.now() - 5000,
           visitCount: 1,
-          url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/url-test',
+          url: originalUrl,
         },
       ];
       mockStorage['tenantMapping'] = {};
@@ -720,7 +724,10 @@ describe('historyStore', () => {
 
       const history = mockStorage['history'];
       const backfilled = history.find((e: any) => e.id === 'url-test');
-      expect(backfilled.url).toContain(guid);
+      // tenantId is backfilled with the GUID
+      expect(backfilled.tenantId).toBe(guid);
+      // url is NOT modified — GUID lives only in tenantId, injected at navigation/copy time
+      expect(backfilled.url).toBe(originalUrl);
     });
   });
 

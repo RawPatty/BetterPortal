@@ -44,6 +44,9 @@ vi.mock('./url-parser', () => ({
     }
     return url;
   }),
+  stripTenantGuidFromUrl: vi.fn((url: string) =>
+    url.replace(/portal\.azure\.com\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i, 'portal.azure.com/')
+  ),
   getCurrentDirectoryInfo: vi.fn(() => ({ domain: 'contoso.onmicrosoft.com', guid: null })),
   isSameDirectory: vi.fn(() => true),
 }));
@@ -188,8 +191,9 @@ describe('bookmarkStore', () => {
       expect(old2.tenantId).toBeNull();
     });
 
-    it('should update URL with GUID during backfill', async () => {
+    it('should backfill tenantId without modifying url during backfill', async () => {
       const guid = '66666666-6666-6666-6666-666666666666';
+      const originalUrl = 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/url-test';
       mockStorage['bookmarks'] = [
         {
           id: 'url-bm',
@@ -203,7 +207,7 @@ describe('bookmarkStore', () => {
           lastAccessed: Date.now() - 10000,
           accessCount: 0,
           isStale: false,
-          url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/url-test',
+          url: originalUrl,
         },
       ];
       mockStorage['tenantMapping'] = {};
@@ -220,7 +224,10 @@ describe('bookmarkStore', () => {
 
       const bookmarks = mockStorage['bookmarks'];
       const backfilled = bookmarks.find((b: any) => b.id === 'url-bm');
-      expect(backfilled.url).toContain(guid);
+      // tenantId is backfilled with the GUID
+      expect(backfilled.tenantId).toBe(guid);
+      // url is NOT modified — GUID lives only in tenantId, injected at navigation/copy time
+      expect(backfilled.url).toBe(originalUrl);
     });
   });
 
@@ -259,7 +266,8 @@ describe('bookmarkStore', () => {
       const bookmarks = mockStorage['bookmarks'] as any[];
       const fixed = bookmarks.find((b: any) => b.id === 'bm-1');
       expect(fixed.tenantId).toBe(domainGuid);
-      expect(fixed.url).toContain(domainGuid);
+      // url is NOT modified — GUID lives only in tenantId
+      expect(fixed.url).not.toContain(domainGuid);
     });
   });
 });
@@ -424,7 +432,8 @@ describe('migrateBookmarks', () => {
 
     const bookmarks = mockStorage['bookmarks'] as any[];
     expect(bookmarks[0].tenantId).toBe(guid);
-    expect(bookmarks[0].url).toContain(guid);
+    // url should NOT contain the GUID — it stays canonical
+    expect(bookmarks[0].url).not.toContain(guid);
   });
 
   it('should fix bookmarks with domain-string tenantId when cache has the domain', async () => {
@@ -444,14 +453,15 @@ describe('migrateBookmarks', () => {
 
     const bookmarks = mockStorage['bookmarks'] as any[];
     expect(bookmarks[0].tenantId).toBe(guid);
-    expect(bookmarks[0].url).toContain(guid);
+    // url should NOT contain the GUID — it stays canonical
+    expect(bookmarks[0].url).not.toContain(guid);
   });
 
-  it('should leave bookmarks with valid GUID tenantId untouched', async () => {
+  it('should strip GUID from url when url already contains a GUID', async () => {
     const guid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-    mockStorage['tenantMapping'] = { 'contoso.onmicrosoft.com': 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' };
+    mockStorage['tenantMapping'] = {};
     mockStorage['bookmarks'] = [{
-      id: 'bm-good',
+      id: 'bm-guid-url',
       url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-3`,
       tenantId: guid,
       tenantName: 'contoso.onmicrosoft.com',
@@ -463,7 +473,29 @@ describe('migrateBookmarks', () => {
     await migrateBookmarks();
 
     const bookmarks = mockStorage['bookmarks'] as any[];
+    expect(bookmarks[0].tenantId).toBe(guid); // tenantId unchanged
+    expect(bookmarks[0].url).not.toContain(guid); // GUID stripped from url
+    expect(bookmarks[0].url).toBe('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-3');
+  });
+
+  it('should leave bookmarks with valid GUID tenantId and no GUID in url untouched', async () => {
+    const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+    mockStorage['tenantMapping'] = {};
+    mockStorage['bookmarks'] = [{
+      id: 'bm-good',
+      url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-3',
+      tenantId: guid,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-3',
+      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
+      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
+    }];
+
+    await migrateBookmarks();
+
+    const bookmarks = mockStorage['bookmarks'] as any[];
     expect(bookmarks[0].tenantId).toBe(guid); // unchanged
+    expect(bookmarks[0].url).not.toContain(guid); // url was already clean
   });
 
   it('should leave bookmarks untouched when domain is not in cache', async () => {
@@ -487,9 +519,10 @@ describe('migrateBookmarks', () => {
   it('should not write to storage when no bookmarks need fixing', async () => {
     const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
     mockStorage['tenantMapping'] = {};
+    // "Clean" bookmark: valid GUID tenantId, url has no GUID in path
     mockStorage['bookmarks'] = [{
       id: 'bm-clean',
-      url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-5`,
+      url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-5',
       tenantId: guid,
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-5',
@@ -504,13 +537,14 @@ describe('migrateBookmarks', () => {
     expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
   });
 
-  it('should not write to storage when all bookmarks already have valid GUIDs', async () => {
+  it('should not write to storage when all bookmarks already have valid GUIDs and clean urls', async () => {
     const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
     // Non-empty mapping so we don't hit the early-exit guard
     mockStorage['tenantMapping'] = { 'contoso.onmicrosoft.com': 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' };
+    // "Clean" bookmark: valid GUID tenantId, url has no GUID in path
     mockStorage['bookmarks'] = [{
       id: 'bm-clean2',
-      url: `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-6`,
+      url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-6',
       tenantId: guid,
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-6',

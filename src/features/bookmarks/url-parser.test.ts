@@ -10,6 +10,7 @@ import {
   normalizePortalUrl,
   isSubscriptionResource,
   buildNavigationUrl,
+  stripTenantGuidFromUrl,
 } from './url-parser';
 
 describe('url-parser', () => {
@@ -528,6 +529,29 @@ describe('url-parser', () => {
         // Should preserve query param order and URL encoding
         expect(result).toContain('?l=en.en-us&redirect=%2Fhome');
       });
+    });
+  });
+
+  describe('stripTenantGuidFromUrl', () => {
+    it('removes GUID from portal URL path', () => {
+      const guid = '12345678-1234-1234-1234-123456789abc';
+      const url = `https://portal.azure.com/${guid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+      expect(stripTenantGuidFromUrl(url)).toBe(
+        'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123'
+      );
+    });
+
+    it('leaves URL unchanged when no GUID in path', () => {
+      const url = 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123';
+      expect(stripTenantGuidFromUrl(url)).toBe(url);
+    });
+
+    it('preserves query params after stripping GUID', () => {
+      const guid = '12345678-1234-1234-1234-123456789abc';
+      const url = `https://portal.azure.com/${guid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
+      expect(stripTenantGuidFromUrl(url)).toBe(
+        'https://portal.azure.com/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123'
+      );
     });
   });
 });

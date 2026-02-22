@@ -889,6 +889,22 @@ export function normalizePortalUrl(url: string): string {
 }
 
 /**
+ * Strip the tenant GUID from a portal URL path.
+ * Used for same-directory navigation to avoid re-auth redirects.
+ *
+ * e.g., https://portal.azure.com/abc-guid/#@contoso... → https://portal.azure.com/#@contoso...
+ *
+ * Azure Portal treats any URL with a GUID in the path as a directory-switch request,
+ * triggering re-authentication even if you're already in that directory.
+ */
+export function stripTenantGuidFromUrl(url: string): string {
+  return url.replace(
+    /portal\.azure\.com\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
+    'portal.azure.com/'
+  );
+}
+
+/**
  * Build a navigation URL with tenant context for cross-tenant navigation
  *
  * Correct format for cross-tenant navigation:

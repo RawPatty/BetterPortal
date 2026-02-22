@@ -46,6 +46,9 @@ vi.mock('../bookmarks/url-parser', () => ({
   isSameDirectory: vi.fn(() => true),
   buildNavigationUrl: vi.fn((url: string) => url),
   stripBlade: vi.fn((url: string) => url),
+  stripTenantGuidFromUrl: vi.fn((url: string) =>
+    url.replace(/portal\.azure\.com\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i, 'portal.azure.com/')
+  ),
 }));
 
 // Mock history store

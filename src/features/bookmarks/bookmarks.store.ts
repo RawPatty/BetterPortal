@@ -9,6 +9,7 @@ import {
   extractResourceName,
   extractDisplayName,
   stripBlade,
+  stripTenantGuidFromUrl,
   buildNavigationUrl,
   getCurrentDirectoryInfo,
   isSameDirectory,
@@ -67,7 +68,8 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     await saveTenantMapping(mapping);
   }
 
-  // Backfill existing bookmarks that have null or domain-string tenantId for this domain
+  // Backfill existing bookmarks that have null or domain-string tenantId for this domain.
+  // Only update tenantId — never the url field; the GUID is injected at navigation/copy time.
   const bookmarks = await readBookmarks();
   if (bookmarks.length > 0) {
     let updated = false;
@@ -75,9 +77,6 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
       const needsFix = !entry.tenantId || !GUID_REGEX.test(entry.tenantId);
       if (needsFix && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
         entry.tenantId = tenantGuid;
-        if (!entry.url.includes(tenantGuid)) {
-          entry.url = buildNavigationUrl(entry.url, tenantGuid);
-        }
         updated = true;
       }
     }
@@ -108,25 +107,31 @@ export async function migrateBookmarks(): Promise<void> {
   if (!bookmarks || bookmarks.length === 0) return;
 
   const mapping = await getTenantMapping();
-  if (Object.keys(mapping).length === 0) return;
-
   let updated = false;
+
   for (const bookmark of bookmarks) {
-    const needsFix = !bookmark.tenantId || !GUID_REGEX.test(bookmark.tenantId);
-    if (!needsFix) continue;
-
-    const domain = bookmark.tenantName?.toLowerCase();
-    if (!domain) continue;
-
-    const guid = mapping[domain];
-    if (!guid) continue;
-
-    bookmark.tenantId = guid;
-    if (!bookmark.url.includes(guid)) {
-      bookmark.url = buildNavigationUrl(bookmark.url, guid);
+    // Fix tenantId: backfill from cached mapping if missing or non-GUID
+    if (Object.keys(mapping).length > 0) {
+      const needsFix = !bookmark.tenantId || !GUID_REGEX.test(bookmark.tenantId);
+      if (needsFix) {
+        const domain = bookmark.tenantName?.toLowerCase();
+        const guid = domain ? mapping[domain] : null;
+        if (guid) {
+          bookmark.tenantId = guid;
+          updated = true;
+          console.log('[BetterPortal] Migrated bookmark tenantId:', bookmark.id, 'domain:', domain, '-> GUID:', guid);
+        }
+      }
     }
-    updated = true;
-    console.log('[BetterPortal] Migrated bookmark:', bookmark.id, 'domain:', domain, '-> GUID:', guid);
+
+    // Strip any GUID from stored url — the url field should be the canonical resource URL.
+    // GUIDs are injected at navigation/copy time from tenantId, never stored in url.
+    const strippedUrl = stripTenantGuidFromUrl(bookmark.url);
+    if (strippedUrl !== bookmark.url) {
+      bookmark.url = strippedUrl;
+      updated = true;
+      console.log('[BetterPortal] Stripped GUID from stored bookmark url:', bookmark.id);
+    }
   }
 
   if (updated) {
@@ -285,11 +290,9 @@ export const bookmarkStore = {
       }
     }
 
-    // If we have a GUID tenant ID, ensure the URL has it in the path for reliable navigation
-    if (effectiveTenantId && !finalUrl.includes(effectiveTenantId)) {
-      finalUrl = buildNavigationUrl(finalUrl, effectiveTenantId);
-      console.log('[BetterPortal] Updated URL with tenant GUID:', finalUrl);
-    }
+    // Strip any tenant GUID from the stored URL — the url field should be the canonical
+    // resource URL. The GUID is stored separately in tenantId and injected at navigation/copy time.
+    finalUrl = stripTenantGuidFromUrl(finalUrl);
 
     console.log('[BetterPortal] Bookmark tenant detection:', {
       urlTenantId: parsed.tenantId,

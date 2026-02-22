@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -26,16 +26,14 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     await saveTenantMapping(mapping);
   }
 
-  // Backfill existing history entries that have null tenantId for this domain
+  // Backfill existing history entries that have null tenantId for this domain.
+  // Only update tenantId — never the url field; the GUID is injected at navigation/copy time.
   const history = await storageGet('history');
   if (history) {
     let updated = false;
     for (const entry of history) {
       if (!entry.tenantId && entry.tenantName?.toLowerCase() === tenantDomain.toLowerCase()) {
         entry.tenantId = tenantGuid;
-        if (!entry.url.includes(tenantGuid)) {
-          entry.url = buildNavigationUrl(entry.url, tenantGuid);
-        }
         updated = true;
       }
     }
@@ -161,11 +159,9 @@ export const historyStore = {
         }
       }
 
-      // If we have a GUID tenant ID, ensure URL has it in path for reliable navigation
-      let finalUrl = url;
-      if (effectiveTenantId && !finalUrl.includes(effectiveTenantId)) {
-        finalUrl = buildNavigationUrl(finalUrl, effectiveTenantId);
-      }
+      // Strip any tenant GUID from the stored URL — the url field should be the canonical
+      // resource URL. The GUID is stored separately in tenantId and injected at navigation/copy time.
+      const finalUrl = stripTenantGuidFromUrl(url);
 
       // Check if entry already exists (use tenantName for grouping consistency)
       const existingIndex = all.findIndex(
