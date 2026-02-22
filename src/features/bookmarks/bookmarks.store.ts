@@ -518,3 +518,23 @@ export const bookmarkStore = {
     });
   },
 };
+
+/**
+ * Migrate bookmarks from local storage to sync storage.
+ * Called when user enables bookmark sync.
+ */
+export async function migrateBookmarksToSync(): Promise<void> {
+  const local = await storageGet('bookmarks') || [];
+  await storageSyncSet('bookmarks', local);
+  await storageRemove('bookmarks');
+}
+
+/**
+ * Migrate bookmarks from sync storage to local storage.
+ * Called when user disables bookmark sync.
+ */
+export async function migrateBookmarksFromSync(): Promise<void> {
+  const synced = await storageSyncGet('bookmarks') || [];
+  await storageSet('bookmarks', synced);
+  await storageSyncRemove('bookmarks');
+}
