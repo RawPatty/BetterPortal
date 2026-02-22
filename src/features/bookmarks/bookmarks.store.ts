@@ -522,10 +522,26 @@ export const bookmarkStore = {
 /**
  * Migrate bookmarks from local storage to sync storage.
  * Called when user enables bookmark sync.
+ * Merges local into sync, deduplicating by resourceId:tenantName.
+ * Sync bookmarks take precedence for duplicates.
  */
 export async function migrateBookmarksToSync(): Promise<void> {
   const local = await storageGet('bookmarks') || [];
-  await storageSyncSet('bookmarks', local);
+  const synced = await storageSyncGet('bookmarks') || [];
+
+  const syncedKeys = new Set(
+    synced.map((b) => `${b.resourceId}:${b.tenantName}`)
+  );
+
+  for (const bookmark of local) {
+    const key = `${bookmark.resourceId}:${bookmark.tenantName}`;
+    if (!syncedKeys.has(key)) {
+      synced.push(bookmark);
+      syncedKeys.add(key);
+    }
+  }
+
+  await storageSyncSet('bookmarks', synced);
   await storageRemove('bookmarks');
 }
 

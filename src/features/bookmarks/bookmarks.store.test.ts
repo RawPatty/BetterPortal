@@ -55,7 +55,7 @@ vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'mock-uuid-' + Math.random().t
 const mockLocation = { href: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123' };
 vi.stubGlobal('window', { location: mockLocation });
 
-import { bookmarkStore, migrateBookmarks } from './bookmarks.store';
+import { bookmarkStore, migrateBookmarks, migrateBookmarksToSync, migrateBookmarksFromSync } from './bookmarks.store';
 import { parsePortalUrl, getTenantGuidFromPortal } from './url-parser';
 import type { BookmarkSaveResult } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
@@ -523,5 +523,84 @@ describe('migrateBookmarks', () => {
     await migrateBookmarks();
 
     expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
+  });
+});
+
+describe('migrateBookmarksToSync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+  });
+
+  it('copies local bookmarks to sync when sync is empty', async () => {
+    mockStorage['bookmarks'] = [makeBookmark('bm-local')];
+
+    await migrateBookmarksToSync();
+
+    expect(mockSyncStorage['bookmarks']).toHaveLength(1);
+    expect(mockSyncStorage['bookmarks'][0].id).toBe('bm-local');
+    expect(mockStorage['bookmarks']).toBeUndefined();
+  });
+
+  it('merges local into sync, deduplicating by resourceId:tenantName', async () => {
+    const shared = {
+      ...makeBookmark('bm-shared'),
+      resourceId: '/subscriptions/sub-1/resourceGroups/shared',
+      tenantName: 'contoso.onmicrosoft.com',
+    };
+    mockSyncStorage['bookmarks'] = [{ ...shared, id: 'bm-sync-version', alias: 'sync alias' }];
+    mockStorage['bookmarks'] = [
+      { ...shared, id: 'bm-local-version', alias: 'local alias' }, // duplicate — should be dropped
+      { ...makeBookmark('bm-local-only'), resourceId: '/subscriptions/sub-1/resourceGroups/local-only' },
+    ];
+
+    await migrateBookmarksToSync();
+
+    const result = mockSyncStorage['bookmarks'];
+    expect(result).toHaveLength(2);
+    // Sync version wins for the duplicate
+    const dup = result.find((b: any) => b.resourceId === shared.resourceId);
+    expect(dup.id).toBe('bm-sync-version');
+    expect(dup.alias).toBe('sync alias');
+    // Local-only item was added
+    expect(result.find((b: any) => b.id === 'bm-local-only')).toBeDefined();
+    // Local storage cleared
+    expect(mockStorage['bookmarks']).toBeUndefined();
+  });
+
+  it('preserves all sync bookmarks even when local is empty', async () => {
+    mockSyncStorage['bookmarks'] = [makeBookmark('bm-sync-only')];
+    mockStorage['bookmarks'] = [];
+
+    await migrateBookmarksToSync();
+
+    expect(mockSyncStorage['bookmarks']).toHaveLength(1);
+    expect(mockSyncStorage['bookmarks'][0].id).toBe('bm-sync-only');
+  });
+});
+
+describe('migrateBookmarksFromSync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+  });
+
+  it('copies sync bookmarks to local and clears sync', async () => {
+    mockSyncStorage['bookmarks'] = [makeBookmark('bm-sync')];
+
+    await migrateBookmarksFromSync();
+
+    expect(mockStorage['bookmarks']).toHaveLength(1);
+    expect(mockStorage['bookmarks'][0].id).toBe('bm-sync');
+    expect(mockSyncStorage['bookmarks']).toBeUndefined();
+  });
+
+  it('writes empty array to local when sync is empty', async () => {
+    await migrateBookmarksFromSync();
+
+    expect(mockStorage['bookmarks']).toEqual([]);
+    expect(mockSyncStorage['bookmarks']).toBeUndefined();
   });
 });
