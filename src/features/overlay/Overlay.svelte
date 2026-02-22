@@ -12,6 +12,7 @@
     settings,
     currentDirectory,
     currentDirectoryDisplay,
+    overlayError,
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
@@ -383,6 +384,12 @@
           </div>
         {/if}
       </header>
+
+      {#if $overlayError}
+        <div class="bp-error-banner" role="alert">
+          {$overlayError}
+        </div>
+      {/if}
 
       <div class="bp-list" bind:this={listRef}>
         {#if flatItems.length === 0}
@@ -871,5 +878,13 @@
     flex-shrink: 0;
   }
 
+  .bp-error-banner {
+    padding: 8px 14px;
+    background: var(--bp-error, #d13438);
+    color: #fff;
+    font-size: 13px;
+    text-align: center;
+    flex-shrink: 0;
+  }
 
 </style>
