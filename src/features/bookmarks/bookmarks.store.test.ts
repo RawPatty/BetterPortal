@@ -55,6 +55,7 @@ vi.stubGlobal('window', { location: mockLocation });
 
 import { bookmarkStore, migrateBookmarks } from './bookmarks.store';
 import { parsePortalUrl, getTenantGuidFromPortal } from './url-parser';
+import type { BookmarkSaveResult } from '../../shared/types';
 
 describe('bookmarkStore', () => {
   beforeEach(() => {
@@ -68,9 +69,10 @@ describe('bookmarkStore', () => {
       const mockGuid = '99999999-9999-9999-9999-999999999999';
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(mockGuid);
 
-      const bookmark = await bookmarkStore.saveCurrentPage();
+      const result = await bookmarkStore.saveCurrentPage();
 
-      expect(bookmark.tenantId).toBe(mockGuid);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(mockGuid);
     });
 
     it('should use cached mapping when no URL GUID and no page context', async () => {
@@ -79,9 +81,10 @@ describe('bookmarkStore', () => {
       };
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
 
-      const bookmark = await bookmarkStore.saveCurrentPage();
+      const result = await bookmarkStore.saveCurrentPage();
 
-      expect(bookmark.tenantId).toBe('88888888-8888-8888-8888-888888888888');
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe('88888888-8888-8888-8888-888888888888');
     });
 
     it('should leave tenantId null when no source has a GUID', async () => {
@@ -98,9 +101,10 @@ describe('bookmarkStore', () => {
       const { getTenantNameFromDOM } = await import('./url-parser');
       vi.mocked(getTenantNameFromDOM).mockReturnValueOnce('unknown-domain.onmicrosoft.com');
 
-      const bookmark = await bookmarkStore.saveCurrentPage();
+      const result = await bookmarkStore.saveCurrentPage();
 
-      expect(bookmark.tenantId).toBeNull();
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBeNull();
     });
 
     it('should prefer URL GUID over other sources', async () => {
@@ -116,9 +120,10 @@ describe('bookmarkStore', () => {
       } as any);
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageGuid);
 
-      const bookmark = await bookmarkStore.saveCurrentPage();
+      const result = await bookmarkStore.saveCurrentPage();
 
-      expect(bookmark.tenantId).toBe(urlGuid);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(urlGuid);
     });
   });
 
@@ -252,6 +257,97 @@ describe('bookmarkStore', () => {
       expect(fixed.tenantId).toBe(domainGuid);
       expect(fixed.url).toContain(domainGuid);
     });
+  });
+});
+
+describe('bookmark limit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+  });
+
+  it('returns limit_reached when bookmarks are at 150 and a new one is saved', async () => {
+    // Fill storage with 150 bookmarks
+    const existing = Array.from({ length: 150 }, (_, i) => ({
+      id: `bm-${i}`,
+      url: `https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      tenantId: null,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: `/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      displayName: `rg-${i}`,
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0,
+      lastAccessed: 0,
+      accessCount: 0,
+      isStale: false,
+    }));
+    mockStorage['bookmarks'] = existing;
+
+    const result = await bookmarkStore.save({
+      id: 'bm-new',
+      url: 'https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-new',
+      tenantId: null,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-1/resourceGroups/rg-new',
+      displayName: 'rg-new',
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0,
+      lastAccessed: 0,
+      accessCount: 0,
+      isStale: false,
+    });
+
+    expect(result).toEqual({ success: false, reason: 'limit_reached' });
+    // Bookmark was NOT added
+    expect(mockStorage['bookmarks']).toHaveLength(150);
+  });
+
+  it('allows updating an existing bookmark even at the limit', async () => {
+    const existing = Array.from({ length: 150 }, (_, i) => ({
+      id: `bm-${i}`,
+      url: `https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      tenantId: null,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: `/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      displayName: `rg-${i}`,
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0,
+      lastAccessed: 0,
+      accessCount: 0,
+      isStale: false,
+    }));
+    mockStorage['bookmarks'] = existing;
+
+    // Update existing bm-0 — should succeed
+    const result = await bookmarkStore.save({ ...existing[0], alias: 'Updated' });
+
+    expect(result).toEqual({ success: true, bookmark: expect.objectContaining({ id: 'bm-0', alias: 'Updated' }) });
+  });
+
+  it('allows saving when under the limit', async () => {
+    mockStorage['bookmarks'] = [];
+
+    const newBookmark = {
+      id: 'bm-new',
+      url: 'https://portal.azure.com/#resource/test',
+      tenantId: null,
+      tenantName: 'contoso.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-1/resourceGroups/rg-new',
+      displayName: 'rg-new',
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0,
+      lastAccessed: 0,
+      accessCount: 0,
+      isStale: false,
+    };
+
+    const result = await bookmarkStore.save(newBookmark);
+    expect(result).toEqual({ success: true, bookmark: expect.objectContaining({ id: 'bm-new' }) });
+    expect(mockStorage['bookmarks']).toHaveLength(1);
   });
 });
 

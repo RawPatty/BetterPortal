@@ -1,6 +1,7 @@
 // Bookmarks store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
-import type { Bookmark } from '../../shared/types';
+import type { Bookmark, BookmarkSaveResult } from '../../shared/types';
+import { MAX_ITEMS } from '../../shared/constants';
 import {
   parsePortalUrl,
   getTenantNameFromDOM,
@@ -166,7 +167,7 @@ export const bookmarkStore = {
   async saveCurrentPage(options?: {
     alias?: string;
     stateDepth?: 'full' | 'resource';
-  }): Promise<Bookmark> {
+  }): Promise<BookmarkSaveResult> {
     const url = window.location.href;
     const parsed = parsePortalUrl(url);
     const settings = await settingsStore.get();
@@ -298,7 +299,7 @@ export const bookmarkStore = {
     );
 
     if (existingIndex >= 0) {
-      // Update existing bookmark
+      // Update existing bookmark — always allowed
       all[existingIndex] = {
         ...all[existingIndex],
         url: bookmark.url,
@@ -307,29 +308,41 @@ export const bookmarkStore = {
         alias: bookmark.alias ?? all[existingIndex].alias,
       };
       await storageSet('bookmarks', all);
-      return all[existingIndex];
+      return { success: true, bookmark: all[existingIndex] };
     }
 
-    // Add new bookmark
+    // New bookmark — enforce limit
+    if (all.length >= MAX_ITEMS.BOOKMARKS) {
+      return { success: false, reason: 'limit_reached' };
+    }
+
     all.push(bookmark);
     await storageSet('bookmarks', all);
-    return bookmark;
+    return { success: true, bookmark };
   },
 
   /**
    * Save a bookmark directly
    */
-  async save(bookmark: Bookmark): Promise<void> {
+  async save(bookmark: Bookmark): Promise<BookmarkSaveResult> {
     const all = await this.getAll();
     const existingIndex = all.findIndex((b) => b.id === bookmark.id);
 
     if (existingIndex >= 0) {
+      // Update existing — always allowed
       all[existingIndex] = bookmark;
-    } else {
-      all.push(bookmark);
+      await storageSet('bookmarks', all);
+      return { success: true, bookmark: all[existingIndex] };
     }
 
+    // New bookmark — enforce limit
+    if (all.length >= MAX_ITEMS.BOOKMARKS) {
+      return { success: false, reason: 'limit_reached' };
+    }
+
+    all.push(bookmark);
     await storageSet('bookmarks', all);
+    return { success: true, bookmark };
   },
 
   /**
