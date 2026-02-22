@@ -10,6 +10,7 @@ import {
   buildNavigationUrl,
 } from '../bookmarks/url-parser';
 import { storageSyncGet, storageSyncSet } from '../../shared/storage';
+import { MAX_ITEMS } from '../../shared/constants';
 
 // Store for overlay visibility
 export const isOverlayOpen = writable(false);
@@ -37,6 +38,17 @@ export const tenantAliases = writable<Record<string, string>>({});
 
 // Store for the current Azure Portal directory (populated on each refresh)
 export const currentDirectory = writable<{ domain: string | null; guid: string | null }>({ domain: null, guid: null });
+
+// Store for inline error messages (e.g. bookmark limit reached). Auto-clears after 4s.
+export const overlayError = writable<string | null>(null);
+
+let _errorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setOverlayError(message: string): void {
+  overlayError.set(message);
+  if (_errorTimer) clearTimeout(_errorTimer);
+  _errorTimer = setTimeout(() => overlayError.set(null), 4000);
+}
 
 // Derived store: current directory with alias resolved from tenantAliases
 export const currentDirectoryDisplay = derived(
@@ -327,7 +339,15 @@ export const overlayActions = {
    * Save current page as bookmark
    */
   async saveCurrentPage(alias?: string) {
-    await bookmarkStore.saveCurrentPage({ alias });
+    const result = await bookmarkStore.saveCurrentPage({ alias });
+    if (!result.success) {
+      if (result.reason === 'limit_reached') {
+        setOverlayError(
+          `Bookmark limit reached (${MAX_ITEMS.BOOKMARKS}/${MAX_ITEMS.BOOKMARKS}) — remove bookmarks to add more.`
+        );
+      }
+      return;
+    }
     await this.refresh();
   },
 
@@ -335,7 +355,6 @@ export const overlayActions = {
    * Convert a history item to a bookmark
    */
   async saveHistoryItem(historyEntry: HistoryEntry) {
-    // Convert history entry to bookmark format
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),
       url: historyEntry.url,
@@ -344,15 +363,22 @@ export const overlayActions = {
       resourceId: historyEntry.resourceId,
       displayName: historyEntry.displayName,
       alias: null,
-      stateDepth: 'full', // Default to full state for history items
+      stateDepth: 'full',
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       accessCount: 0,
       isStale: false,
     };
 
-    // Save the bookmark
-    await bookmarkStore.save(bookmark);
+    const result = await bookmarkStore.save(bookmark);
+    if (!result.success) {
+      if (result.reason === 'limit_reached') {
+        setOverlayError(
+          `Bookmark limit reached (${MAX_ITEMS.BOOKMARKS}/${MAX_ITEMS.BOOKMARKS}) — remove bookmarks to add more.`
+        );
+      }
+      return;
+    }
     await this.refresh();
   },
 

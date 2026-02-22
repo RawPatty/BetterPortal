@@ -41,6 +41,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   extractResourceName: vi.fn(() => 'my-app'),
   getTenantNameFromDOM: vi.fn(() => 'test.onmicrosoft.com'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
+  getTenantGuidFromPortal: vi.fn(() => null),
   getCurrentDirectoryInfo: vi.fn(() => ({ domain: 'test.onmicrosoft.com', guid: null })),
   isSameDirectory: vi.fn(() => true),
   buildNavigationUrl: vi.fn((url: string) => url),
@@ -56,7 +57,7 @@ vi.mock('../history/history.store', () => ({
   },
 }));
 
-import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, currentDirectoryDisplay, itemsByTenant } from './overlay.store';
+import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, currentDirectoryDisplay, itemsByTenant, overlayError } from './overlay.store';
 import { storageGet, storageSet, storageSyncSet } from '../../shared/storage';
 import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
@@ -323,6 +324,75 @@ function makeBookmark(id: string, tenantName: string, tenantId: string | null, r
     isStale: false,
   };
 }
+
+describe('overlayError on limit_reached', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+    Object.keys(mockSyncStorage).forEach(key => delete mockSyncStorage[key]);
+    overlayError.set(null);
+  });
+
+  it('sets overlayError message when bookmark limit is reached', async () => {
+    // Fill local storage with 150 bookmarks so the next save hits the cap
+    mockStorage['bookmarks'] = Array.from({ length: 150 }, (_, i) => ({
+      id: `bm-${i}`,
+      url: `https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      tenantId: null,
+      tenantName: 'test.onmicrosoft.com',
+      resourceId: `/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      displayName: `rg-${i}`,
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
+    }));
+
+    await overlayActions.saveCurrentPage();
+
+    expect(get(overlayError)).toBe(
+      'Bookmark limit reached (150/150) — remove bookmarks to add more.'
+    );
+  });
+
+  it('does not set overlayError on successful save', async () => {
+    mockStorage['bookmarks'] = [];
+
+    await overlayActions.saveCurrentPage();
+
+    expect(get(overlayError)).toBeNull();
+  });
+
+  it('sets overlayError when saving a history item hits the limit', async () => {
+    mockStorage['bookmarks'] = Array.from({ length: 150 }, (_, i) => ({
+      id: `bm-${i}`,
+      url: `https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      tenantId: null,
+      tenantName: 'test.onmicrosoft.com',
+      resourceId: `/subscriptions/sub-1/resourceGroups/rg-${i}`,
+      displayName: `rg-${i}`,
+      alias: null,
+      stateDepth: 'full' as const,
+      createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
+    }));
+
+    const historyEntry = {
+      id: 'h-1',
+      url: 'https://portal.azure.com/#resource/subscriptions/sub-1/resourceGroups/rg-new',
+      tenantId: null,
+      tenantName: 'test.onmicrosoft.com',
+      resourceId: '/subscriptions/sub-1/resourceGroups/rg-new',
+      displayName: 'rg-new',
+      visitedAt: Date.now(),
+      visitCount: 1,
+    };
+
+    await overlayActions.saveHistoryItem(historyEntry);
+
+    expect(get(overlayError)).toBe(
+      'Bookmark limit reached (150/150) — remove bookmarks to add more.'
+    );
+  });
+});
 
 describe('currentDirectory store', () => {
   beforeEach(() => {
