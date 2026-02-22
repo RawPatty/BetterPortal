@@ -60,7 +60,7 @@ vi.mock('../history/history.store', () => ({
   },
 }));
 
-import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, currentDirectory, currentDirectoryDisplay, itemsByTenant, overlayError } from './overlay.store';
+import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, selectedIndex, currentDirectory, currentDirectoryDisplay, itemsByTenant, overlayError } from './overlay.store';
 import { storageGet, storageSet, storageSyncSet } from '../../shared/storage';
 import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
@@ -600,6 +600,86 @@ describe('itemsByTenant grouping', () => {
     const keys = [...get(itemsByTenant).keys()];
     expect(keys[0]).toBe('fabrikam.onmicrosoft.com');
     expect(keys[1]).toBe('contoso.onmicrosoft.com');
+  });
+});
+
+describe('keyboard navigation (moveDown / moveUp)', () => {
+  beforeEach(() => {
+    bookmarks.set([]);
+    searchQuery.set('');
+    selectedIndex.set(0);
+  });
+
+  afterEach(() => {
+    bookmarks.set([]);
+    searchQuery.set('');
+    selectedIndex.set(0);
+  });
+
+  it('moveDown advances selection by exactly one step', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-1', 'rg-b'),
+    ]);
+    selectedIndex.set(0);
+
+    overlayActions.moveDown();
+
+    expect(get(selectedIndex)).toBe(1);
+  });
+
+  it('moveUp moves selection back by exactly one step', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-1', 'rg-b'),
+    ]);
+    selectedIndex.set(1);
+
+    overlayActions.moveUp();
+
+    expect(get(selectedIndex)).toBe(0);
+  });
+
+  it('moveDown wraps to first item when at end of list', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-1', 'rg-b'),
+    ]);
+    selectedIndex.set(1);
+
+    overlayActions.moveDown();
+
+    expect(get(selectedIndex)).toBe(0);
+  });
+
+  it('moveUp wraps to last item when at start of list', () => {
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-1', 'rg-b'),
+      makeBookmark('bm-3', 'contoso.onmicrosoft.com', 'guid-1', 'rg-c'),
+    ]);
+    selectedIndex.set(0);
+
+    overlayActions.moveUp();
+
+    expect(get(selectedIndex)).toBe(2);
+  });
+
+  it('calling moveDown twice from index 0 with 2 items cancels out to index 0 (demonstrates the double-call bug pattern)', () => {
+    // This test documents why handleSearchKeydown must NOT also call moveDown/moveUp —
+    // with 2 filtered items the double-call wraps back to the starting position,
+    // making navigation appear to do nothing visible.
+    bookmarks.set([
+      makeBookmark('bm-1', 'contoso.onmicrosoft.com', 'guid-1', 'rg-a'),
+      makeBookmark('bm-2', 'contoso.onmicrosoft.com', 'guid-1', 'rg-b'),
+    ]);
+    selectedIndex.set(0);
+
+    overlayActions.moveDown(); // 0 → 1
+    overlayActions.moveDown(); // 1 → 0 (wraps)
+
+    // End result looks like nothing happened — this is the bug the fix prevents
+    expect(get(selectedIndex)).toBe(0);
   });
 });
 

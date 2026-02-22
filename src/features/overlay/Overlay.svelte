@@ -258,13 +258,10 @@
     } else if (event.key === 'Enter') {
       event.preventDefault();
       overlayActions.selectCurrent();
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      overlayActions.moveDown();
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      overlayActions.moveUp();
     }
+    // ArrowDown/ArrowUp are handled by the document capture listener (handleOverlayKeydown)
+    // which fires first and calls moveDown/moveUp + scrollToSelected. Handling them here
+    // too would call moveDown/moveUp twice, causing navigation to cancel out on small lists.
   }
 
   function handleSearchInput(event: Event) {
