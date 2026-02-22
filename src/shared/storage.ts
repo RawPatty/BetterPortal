@@ -9,7 +9,6 @@ const SCHEMA_VERSIONS = {
   bookmarks: 1,
   history: 1,
   settings: 1,
-  snapshots: 1,
 } as const;
 
 /**
@@ -89,6 +88,62 @@ export async function storageRemove(key: StorageKey): Promise<void> {
 }
 
 /**
+ * Get a value from Chrome sync storage
+ */
+export async function storageSyncGet<K extends StorageKey>(
+  key: K
+): Promise<StorageSchema[K] | null> {
+  if (!isContextValid()) handleInvalidContext();
+
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage.sync.get(key, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(result[key] ?? null);
+        }
+      });
+    } catch (e) {
+      handleInvalidContext();
+    }
+  });
+}
+
+/**
+ * Set a value in Chrome sync storage
+ */
+export async function storageSyncSet<K extends StorageKey>(
+  key: K,
+  value: StorageSchema[K]
+): Promise<void> {
+  if (!isContextValid()) handleInvalidContext();
+
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage.sync.set({ [key]: value }, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve();
+        }
+      });
+    } catch (e) {
+      handleInvalidContext();
+    }
+  });
+}
+
+/**
+ * Remove a key from Chrome sync storage
+ */
+export async function storageSyncRemove(key: StorageKey): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.sync.remove(key, resolve);
+  });
+}
+
+/**
  * Get multiple values from Chrome storage
  */
 export async function storageGetMany<K extends StorageKey>(
@@ -138,7 +193,6 @@ export async function runMigrations(): Promise<void> {
     'bookmarks_version',
     'history_version',
     'settings_version',
-    'snapshots_version',
   ] as const;
 
   const versions = await storageGetMany([...versionKeys]);
@@ -190,12 +244,6 @@ async function migrateSchema(
         }
         break;
 
-      case 'snapshots':
-        const snapshots = await storageGet('snapshots');
-        if (!snapshots) {
-          await storageSet('snapshots', []);
-        }
-        break;
     }
   }
 }
@@ -215,7 +263,6 @@ export async function exportAllData(): Promise<string> {
     'bookmarks',
     'history',
     'settings',
-    'snapshots',
   ]);
 
   return JSON.stringify({
