@@ -107,7 +107,7 @@ All data is used **exclusively for the extension's functionality**:
 - No third-party services
 - No analytics providers
 - No advertising networks
-- No external APIs (except Azure's own management.azure.com for future diff feature)
+- No external APIs
 - No remote logging
 
 ## Your Rights and Control

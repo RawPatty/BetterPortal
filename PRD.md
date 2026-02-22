@@ -98,7 +98,7 @@ BetterPortal is a Chrome extension that provides instant access to saved Azure r
 
 **Export**: JSON export of all bookmarks and settings
 
-**Future (Paid)**: Cloud sync across devices
+**Implemented**: Cloud sync across devices via chrome.storage.sync (opt-in, up to 150 bookmarks)
 
 ---
 
@@ -209,8 +209,8 @@ interface Settings {
 | Feature | Rationale | Target Version |
 |---------|-----------|----------------|
 | Multi-browser support | Focus on Chrome first | v1.1 |
-| Cloud sync | Requires backend infrastructure | v2.0 (Paid) |
-| Live polling/monitoring | Complex, before/after diff covers core use case | v2.0 |
+| Cloud sync | ✅ Implemented via chrome.storage.sync | v1.x |
+| Live polling/monitoring | Not planned | - |
 | Auto-detect related resources | Requires ARM graph traversal | v1.2 |
 | Advanced folder/tag organization | Flat list + search sufficient for MVP | v1.1 |
 | Firefox/Edge support | Manifest V3 compatible, but Chrome priority | v1.1 |
@@ -223,7 +223,6 @@ interface Settings {
 2. **Daily Active Usage**: Overlay invocations per user per day
 3. **Bookmark Volume**: Average bookmarks per user
 4. **Tenant Coverage**: % of user's tenants with saved bookmarks
-5. **Diff Feature Adoption**: % of users using before/after diff
 
 ---
 
@@ -231,9 +230,7 @@ interface Settings {
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Portal session token expiry | Diff/monitoring fails | Graceful fallback, prompt user to refresh portal |
 | Azure portal DOM changes | Content script breaks | Abstract DOM interactions, monitor for portal updates |
-| ARM API rate limits | Diff feature throttled | Cache responses, batch requests, implement backoff |
 | Manifest V3 restrictions | Background script limitations | Use service worker patterns, chrome.storage APIs |
 
 ---
@@ -253,15 +250,9 @@ interface Settings {
 - Stale resource detection
 - Export functionality
 
-### Phase 3: Diff Feature
-- Snapshot capture via ARM API
-- Before/after comparison
-- Inline diff visualization
-
-### Phase 4: Future Enhancements (Post-MVP)
-- Cloud sync (paid tier)
+### Phase 3: Future Enhancements
+- Cloud sync (implemented in v1.x via chrome.storage.sync)
 - Multi-browser support
-- Live polling dashboard
 - Related resource detection
 - Advanced organization (folders, tags)
 

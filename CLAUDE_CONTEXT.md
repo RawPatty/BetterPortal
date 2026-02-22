@@ -83,7 +83,7 @@ npm test          # Run tests
 6. Press `Ctrl+Space`
 
 ## Future Enhancements
-- Cloud sync (paid tier)
+- Cloud sync (implemented via chrome.storage.sync)
 - Multi-browser support
-- Live polling dashboard
 - Related resource detection
+- Advanced organization (folders, tags)
