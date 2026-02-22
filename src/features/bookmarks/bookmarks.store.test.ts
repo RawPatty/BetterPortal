@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock chrome.storage
 const mockStorage: Record<string, any> = {};
+const mockSyncStorage: Record<string, any> = {};
 vi.mock('../../shared/storage', () => ({
-  storageGet: vi.fn((key: string) => Promise.resolve(mockStorage[key])),
-  storageSet: vi.fn((key: string, value: any) => {
-    mockStorage[key] = value;
-    return Promise.resolve();
-  }),
+  storageGet: vi.fn((key: string) => Promise.resolve(mockStorage[key] ?? null)),
+  storageSet: vi.fn((key: string, value: any) => { mockStorage[key] = value; return Promise.resolve(); }),
+  storageRemove: vi.fn((key: string) => { delete mockStorage[key]; return Promise.resolve(); }),
+  storageSyncGet: vi.fn((key: string) => Promise.resolve(mockSyncStorage[key] ?? null)),
+  storageSyncSet: vi.fn((key: string, value: any) => { mockSyncStorage[key] = value; return Promise.resolve(); }),
+  storageSyncRemove: vi.fn((key: string) => { delete mockSyncStorage[key]; return Promise.resolve(); }),
 }));
 
 // Mock settings store
@@ -56,6 +58,8 @@ vi.stubGlobal('window', { location: mockLocation });
 import { bookmarkStore, migrateBookmarks } from './bookmarks.store';
 import { parsePortalUrl, getTenantGuidFromPortal } from './url-parser';
 import type { BookmarkSaveResult } from '../../shared/types';
+import { DEFAULT_SETTINGS } from '../../shared/types';
+import { settingsStore } from '../settings/settings.store';
 
 describe('bookmarkStore', () => {
   beforeEach(() => {
@@ -348,6 +352,52 @@ describe('bookmark limit', () => {
     const result = await bookmarkStore.save(newBookmark);
     expect(result).toEqual({ success: true, bookmark: expect.objectContaining({ id: 'bm-new' }) });
     expect(mockStorage['bookmarks']).toHaveLength(1);
+  });
+});
+
+function makeBookmark(id: string) {
+  return {
+    id,
+    url: 'https://portal.azure.com/#resource/test',
+    tenantId: null,
+    tenantName: 'contoso.onmicrosoft.com',
+    resourceId: `/subscriptions/sub-1/resourceGroups/${id}`,
+    displayName: id,
+    alias: null,
+    stateDepth: 'full' as const,
+    createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
+  };
+}
+
+describe('bookmark sync routing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+  });
+
+  it('reads from local storage when bookmarkSyncEnabled is false', async () => {
+    vi.mocked(settingsStore.get).mockResolvedValueOnce({
+      ...DEFAULT_SETTINGS,
+      bookmarkSyncEnabled: false,
+    });
+    mockStorage['bookmarks'] = [makeBookmark('bm-local')];
+
+    const result = await bookmarkStore.getAll();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('bm-local');
+  });
+
+  it('reads from sync storage when bookmarkSyncEnabled is true', async () => {
+    vi.mocked(settingsStore.get).mockResolvedValueOnce({
+      ...DEFAULT_SETTINGS,
+      bookmarkSyncEnabled: true,
+    });
+    mockSyncStorage['bookmarks'] = [makeBookmark('bm-sync')];
+
+    const result = await bookmarkStore.getAll();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('bm-sync');
   });
 });
 

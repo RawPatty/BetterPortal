@@ -1,5 +1,5 @@
 // Bookmarks store for BetterPortal
-import { storageGet, storageSet } from '../../shared/storage';
+import { storageGet, storageSet, storageRemove, storageSyncGet, storageSyncSet, storageSyncRemove } from '../../shared/storage';
 import type { Bookmark, BookmarkSaveResult } from '../../shared/types';
 import { MAX_ITEMS } from '../../shared/constants';
 import {
@@ -31,6 +31,28 @@ async function saveTenantMapping(mapping: TenantMapping): Promise<void> {
   await storageSet('tenantMapping' as any, mapping);
 }
 
+async function getBookmarkArea(): Promise<'sync' | 'local'> {
+  const s = await settingsStore.get();
+  return s.bookmarkSyncEnabled ? 'sync' : 'local';
+}
+
+async function readBookmarks(): Promise<Bookmark[]> {
+  const area = await getBookmarkArea();
+  const data = area === 'sync'
+    ? await storageSyncGet('bookmarks')
+    : await storageGet('bookmarks');
+  return data || [];
+}
+
+async function writeBookmarks(bookmarks: Bookmark[]): Promise<void> {
+  const area = await getBookmarkArea();
+  if (area === 'sync') {
+    await storageSyncSet('bookmarks', bookmarks);
+  } else {
+    await storageSet('bookmarks', bookmarks);
+  }
+}
+
 /**
  * Learn and cache the domain → GUID mapping from a URL
  * When URL has both GUID in path and domain in hash, we can learn the mapping
@@ -46,8 +68,8 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
   }
 
   // Backfill existing bookmarks that have null or domain-string tenantId for this domain
-  const bookmarks = await storageGet('bookmarks');
-  if (bookmarks) {
+  const bookmarks = await readBookmarks();
+  if (bookmarks.length > 0) {
     let updated = false;
     for (const entry of bookmarks) {
       const needsFix = !entry.tenantId || !GUID_REGEX.test(entry.tenantId);
@@ -60,7 +82,7 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
       }
     }
     if (updated) {
-      await storageSet('bookmarks', bookmarks);
+      await writeBookmarks(bookmarks);
       console.log('[BetterPortal] Backfilled missing or invalid tenantIds for domain:', tenantDomain);
     }
   }
@@ -82,7 +104,7 @@ export async function lookupTenantGuid(tenantDomain: string): Promise<string | n
  * Uses cached tenantMapping — bookmarks for unknown domains are left unchanged.
  */
 export async function migrateBookmarks(): Promise<void> {
-  const bookmarks = await storageGet('bookmarks');
+  const bookmarks = await readBookmarks();
   if (!bookmarks || bookmarks.length === 0) return;
 
   const mapping = await getTenantMapping();
@@ -108,7 +130,7 @@ export async function migrateBookmarks(): Promise<void> {
   }
 
   if (updated) {
-    await storageSet('bookmarks', bookmarks);
+    await writeBookmarks(bookmarks);
     console.log('[BetterPortal] Bookmark migration complete');
   }
 }
@@ -118,8 +140,7 @@ export const bookmarkStore = {
    * Get all bookmarks
    */
   async getAll(): Promise<Bookmark[]> {
-    const bookmarks = await storageGet('bookmarks');
-    return bookmarks || [];
+    return readBookmarks();
   },
 
   /**
@@ -307,7 +328,7 @@ export const bookmarkStore = {
         stateDepth: bookmark.stateDepth,
         alias: bookmark.alias ?? all[existingIndex].alias,
       };
-      await storageSet('bookmarks', all);
+      await writeBookmarks(all);
       return { success: true, bookmark: all[existingIndex] };
     }
 
@@ -317,7 +338,7 @@ export const bookmarkStore = {
     }
 
     all.push(bookmark);
-    await storageSet('bookmarks', all);
+    await writeBookmarks(all);
     return { success: true, bookmark };
   },
 
@@ -331,7 +352,7 @@ export const bookmarkStore = {
     if (existingIndex >= 0) {
       // Update existing — always allowed
       all[existingIndex] = bookmark;
-      await storageSet('bookmarks', all);
+      await writeBookmarks(all);
       return { success: true, bookmark: all[existingIndex] };
     }
 
@@ -341,7 +362,7 @@ export const bookmarkStore = {
     }
 
     all.push(bookmark);
-    await storageSet('bookmarks', all);
+    await writeBookmarks(all);
     return { success: true, bookmark };
   },
 
@@ -357,7 +378,7 @@ export const bookmarkStore = {
     }
 
     all[index] = { ...all[index], ...partial };
-    await storageSet('bookmarks', all);
+    await writeBookmarks(all);
     return all[index];
   },
 
@@ -372,7 +393,7 @@ export const bookmarkStore = {
       return false;
     }
 
-    await storageSet('bookmarks', filtered);
+    await writeBookmarks(filtered);
     return true;
   },
 
@@ -467,7 +488,7 @@ export const bookmarkStore = {
       }
     }
 
-    await storageSet('bookmarks', existing);
+    await writeBookmarks(existing);
     return { added, skipped };
   },
 
