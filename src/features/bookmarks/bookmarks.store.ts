@@ -1,5 +1,5 @@
 // Bookmarks store for BetterPortal
-import { storageGet, storageSet, storageRemove, storageSyncGet, storageSyncSet, storageSyncRemove } from '../../shared/storage';
+import { storageGet, storageSet, storageRemove, storageSyncGet, storageSyncSet, storageSyncRemove, storageSyncGetBookmarks, storageSyncSetBookmarks } from '../../shared/storage';
 import type { Bookmark, BookmarkSaveResult } from '../../shared/types';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
 import {
@@ -37,16 +37,17 @@ async function getBookmarkArea(): Promise<'sync' | 'local'> {
 
 async function readBookmarks(): Promise<Bookmark[]> {
   const area = await getBookmarkArea();
-  const data = area === 'sync'
-    ? await storageSyncGet('bookmarks')
-    : await storageGet('bookmarks');
+  if (area === 'sync') {
+    return storageSyncGetBookmarks();
+  }
+  const data = await storageGet('bookmarks');
   return data || [];
 }
 
 async function writeBookmarks(bookmarks: Bookmark[]): Promise<void> {
   const area = await getBookmarkArea();
   if (area === 'sync') {
-    await storageSyncSet('bookmarks', bookmarks);
+    await storageSyncSetBookmarks(bookmarks);
   } else {
     await storageSet('bookmarks', bookmarks);
   }
@@ -504,21 +505,40 @@ export const bookmarkStore = {
  */
 export async function migrateBookmarksToSync(): Promise<void> {
   const local = await storageGet('bookmarks') || [];
-  const synced = await storageSyncGet('bookmarks') || [];
+  // Read existing per-item sync bookmarks (current format)
+  const syncedPerItem = await storageSyncGetBookmarks();
+  // Also check old single-key format (backward compat for users on previous version)
+  const syncedOldFormat = await storageSyncGet('bookmarks') || [];
 
-  const syncedKeys = new Set(
-    synced.map((b) => `${b.resourceId}:${b.tenantName}`)
-  );
+  // Start with per-item sync bookmarks (most authoritative)
+  const merged = [...syncedPerItem];
+  const syncedKeys = new Set(syncedPerItem.map((b) => `${b.resourceId}:${b.tenantName}`));
 
-  for (const bookmark of local) {
+  // Add old-format sync bookmarks not already present
+  for (const bookmark of syncedOldFormat) {
     const key = `${bookmark.resourceId}:${bookmark.tenantName}`;
     if (!syncedKeys.has(key)) {
-      synced.push(bookmark);
+      merged.push(bookmark);
       syncedKeys.add(key);
     }
   }
 
-  await storageSyncSet('bookmarks', synced);
+  // Add local bookmarks not already in sync
+  for (const bookmark of local) {
+    const key = `${bookmark.resourceId}:${bookmark.tenantName}`;
+    if (!syncedKeys.has(key)) {
+      merged.push(bookmark);
+      syncedKeys.add(key);
+    }
+  }
+
+  await storageSyncSetBookmarks(merged);
+
+  // Remove old single-key format if it existed
+  if (syncedOldFormat.length > 0) {
+    await storageSyncRemove('bookmarks');
+  }
+
   await storageRemove('bookmarks');
 }
 
@@ -527,7 +547,25 @@ export async function migrateBookmarksToSync(): Promise<void> {
  * Called when user disables bookmark sync.
  */
 export async function migrateBookmarksFromSync(): Promise<void> {
-  const synced = await storageSyncGet('bookmarks') || [];
-  await storageSet('bookmarks', synced);
-  await storageSyncRemove('bookmarks');
+  // Read per-item sync bookmarks (current format)
+  const syncedPerItem = await storageSyncGetBookmarks();
+  // Also check old single-key format (backward compat)
+  const syncedOldFormat = await storageSyncGet('bookmarks') || [];
+
+  // Merge, per-item takes precedence (newer format)
+  const merged = [...syncedPerItem];
+  const seenIds = new Set(syncedPerItem.map((b) => b.id));
+  for (const b of syncedOldFormat) {
+    if (!seenIds.has(b.id)) merged.push(b);
+  }
+
+  await storageSet('bookmarks', merged);
+
+  // Clear all per-item sync keys
+  await storageSyncSetBookmarks([]);
+
+  // Clear old single-key format if it existed
+  if (syncedOldFormat.length > 0) {
+    await storageSyncRemove('bookmarks');
+  }
 }

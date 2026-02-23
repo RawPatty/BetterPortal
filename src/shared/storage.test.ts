@@ -14,9 +14,22 @@ Object.defineProperty(globalThis, 'chrome', {
     runtime: { id: 'test', lastError: undefined },
     storage: {
       sync: {
-        get: vi.fn((key, cb) => cb({ [key]: mockSyncStorage[key] })),
+        get: vi.fn((key, cb) => {
+          if (key === null) {
+            cb({ ...mockSyncStorage });
+          } else {
+            cb({ [key]: mockSyncStorage[key] });
+          }
+        }),
         set: vi.fn((obj, cb) => { Object.assign(mockSyncStorage, obj); cb?.(); }),
-        remove: vi.fn((key, cb) => { delete mockSyncStorage[key]; cb?.(); }),
+        remove: vi.fn((key, cb) => {
+          if (Array.isArray(key)) {
+            key.forEach((k: string) => delete mockSyncStorage[k]);
+          } else {
+            delete mockSyncStorage[key];
+          }
+          cb?.();
+        }),
         getBytesInUse: vi.fn((_, cb) => cb(0)),
       },
       local: {
@@ -31,7 +44,25 @@ Object.defineProperty(globalThis, 'chrome', {
   writable: true,
 });
 
-import { storageSyncGet, storageSyncSet, storageSyncRemove, migrateSettingsToSync } from './storage';
+import { storageSyncGet, storageSyncSet, storageSyncRemove, storageSyncGetBookmarks, storageSyncSetBookmarks, migrateSettingsToSync } from './storage';
+import type { Bookmark } from './types';
+
+function makeBookmark(id: string): Bookmark {
+  return {
+    id,
+    url: `https://portal.azure.com/#resource/test/${id}`,
+    tenantId: null,
+    tenantName: 'contoso.onmicrosoft.com',
+    resourceId: `/subscriptions/sub-1/resourceGroups/${id}`,
+    displayName: id,
+    alias: null,
+    stateDepth: 'full',
+    createdAt: 0,
+    lastAccessed: 0,
+    accessCount: 0,
+    isStale: false,
+  };
+}
 
 describe('migrateSettingsToSync', () => {
   beforeEach(() => {
@@ -91,5 +122,87 @@ describe('sync storage primitives', () => {
     mockSyncStorage['tenantAliases'] = { foo: 'bar' };
     await storageSyncRemove('tenantAliases');
     expect(await storageSyncGet('tenantAliases')).toBeNull();
+  });
+});
+
+describe('storageSyncGetBookmarks', () => {
+  beforeEach(() => {
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+    vi.clearAllMocks();
+  });
+
+  it('returns empty array when no bp_bm_* keys exist', async () => {
+    mockSyncStorage['settings'] = { theme: 'light' };
+    expect(await storageSyncGetBookmarks()).toEqual([]);
+  });
+
+  it('returns bookmarks from bp_bm_* keys', async () => {
+    const bm1 = makeBookmark('bm-1');
+    const bm2 = makeBookmark('bm-2');
+    mockSyncStorage['bp_bm_bm-1'] = bm1;
+    mockSyncStorage['bp_bm_bm-2'] = bm2;
+
+    const result = await storageSyncGetBookmarks();
+
+    expect(result).toHaveLength(2);
+    expect(result.map(b => b.id).sort()).toEqual(['bm-1', 'bm-2']);
+  });
+
+  it('ignores non-bookmark sync keys', async () => {
+    mockSyncStorage['settings'] = { theme: 'dark' };
+    mockSyncStorage['tenantAliases'] = { foo: 'bar' };
+    mockSyncStorage['bp_bm_bm-1'] = makeBookmark('bm-1');
+
+    const result = await storageSyncGetBookmarks();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('bm-1');
+  });
+});
+
+describe('storageSyncSetBookmarks', () => {
+  beforeEach(() => {
+    Object.keys(mockSyncStorage).forEach(k => delete mockSyncStorage[k]);
+    vi.clearAllMocks();
+  });
+
+  it('stores each bookmark under its own bp_bm_<id> key', async () => {
+    const bm1 = makeBookmark('bm-1');
+    const bm2 = makeBookmark('bm-2');
+
+    await storageSyncSetBookmarks([bm1, bm2]);
+
+    expect(mockSyncStorage['bp_bm_bm-1']).toEqual(bm1);
+    expect(mockSyncStorage['bp_bm_bm-2']).toEqual(bm2);
+  });
+
+  it('removes keys for bookmarks no longer in the list', async () => {
+    mockSyncStorage['bp_bm_bm-old'] = makeBookmark('bm-old');
+    const bm = makeBookmark('bm-new');
+
+    await storageSyncSetBookmarks([bm]);
+
+    expect(mockSyncStorage['bp_bm_bm-old']).toBeUndefined();
+    expect(mockSyncStorage['bp_bm_bm-new']).toEqual(bm);
+  });
+
+  it('clears all bp_bm_* keys when called with empty list', async () => {
+    mockSyncStorage['bp_bm_bm-1'] = makeBookmark('bm-1');
+    mockSyncStorage['bp_bm_bm-2'] = makeBookmark('bm-2');
+    mockSyncStorage['settings'] = { theme: 'light' };
+
+    await storageSyncSetBookmarks([]);
+
+    expect(mockSyncStorage['bp_bm_bm-1']).toBeUndefined();
+    expect(mockSyncStorage['bp_bm_bm-2']).toBeUndefined();
+    expect(mockSyncStorage['settings']).toEqual({ theme: 'light' });
+  });
+
+  it('does not touch non-bookmark sync keys', async () => {
+    mockSyncStorage['settings'] = { theme: 'dark' };
+
+    await storageSyncSetBookmarks([makeBookmark('bm-1')]);
+
+    expect(mockSyncStorage['settings']).toEqual({ theme: 'dark' });
   });
 });

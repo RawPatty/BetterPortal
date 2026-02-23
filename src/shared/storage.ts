@@ -1,5 +1,5 @@
 // Chrome storage wrapper with typed access and migration support
-import type { StorageSchema } from './types';
+import type { StorageSchema, Bookmark } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 type StorageKey = keyof StorageSchema;
@@ -141,6 +141,81 @@ export async function storageSyncRemove(key: StorageKey): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.sync.remove(key, resolve);
   });
+}
+
+const BOOKMARK_KEY_PREFIX = 'bp_bm_';
+
+/**
+ * Get all bookmarks from Chrome sync storage.
+ * Each bookmark is stored under its own key (bp_bm_<id>) to stay within
+ * Chrome's 8,192 byte per-item quota.
+ */
+export async function storageSyncGetBookmarks(): Promise<Bookmark[]> {
+  if (!isContextValid()) handleInvalidContext();
+
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage.sync.get(null, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          const bookmarks = Object.entries(result)
+            .filter(([key]) => key.startsWith(BOOKMARK_KEY_PREFIX))
+            .map(([, value]) => value as Bookmark);
+          resolve(bookmarks);
+        }
+      });
+    } catch (e) {
+      handleInvalidContext();
+    }
+  });
+}
+
+/**
+ * Write bookmarks to Chrome sync storage using per-item keys (bp_bm_<id>).
+ * Removes keys for any bookmarks that were deleted from the list.
+ */
+export async function storageSyncSetBookmarks(bookmarks: Bookmark[]): Promise<void> {
+  if (!isContextValid()) handleInvalidContext();
+
+  // Read existing bp_bm_* keys to find which ones to delete
+  const existing = await storageSyncGetBookmarks();
+  const newIds = new Set(bookmarks.map(b => b.id));
+  const toDelete = existing
+    .filter(b => !newIds.has(b.id))
+    .map(b => `${BOOKMARK_KEY_PREFIX}${b.id}`);
+
+  // Write all bookmarks as individual keys
+  if (bookmarks.length > 0) {
+    const toSet: Record<string, Bookmark> = {};
+    for (const b of bookmarks) {
+      toSet[`${BOOKMARK_KEY_PREFIX}${b.id}`] = b;
+    }
+    await new Promise<void>((resolve, reject) => {
+      try {
+        chrome.storage.sync.set(toSet, () => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve();
+        });
+      } catch (e) {
+        handleInvalidContext();
+      }
+    });
+  }
+
+  // Remove deleted bookmark keys
+  if (toDelete.length > 0) {
+    await new Promise<void>((resolve, reject) => {
+      try {
+        chrome.storage.sync.remove(toDelete as any, () => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve();
+        });
+      } catch (e) {
+        handleInvalidContext();
+      }
+    });
+  }
 }
 
 /**
