@@ -1,5 +1,5 @@
 // URL Parser for Azure Portal URLs
-import { PORTAL_URL_PATTERNS, PORTAL_SELECTORS } from '../../shared/constants';
+import { PORTAL_URL_PATTERNS, PORTAL_SELECTORS, GUID_REGEX } from '../../shared/constants';
 import type { ParsedPortalUrl } from '../../shared/types';
 
 /**
@@ -98,13 +98,11 @@ export function parsePortalUrl(url: string): ParsedPortalUrl {
             result.resourceId = `/resourceGroups/${rgMatch[1]}/providers/Microsoft.Storage/storageAccounts/${storageAccount}/blobServices/default/containers/${containerName}`;
           }
         }
-        console.log('[BetterPortal] Extracted from path format:', result.resourceId);
       } else {
         // Try subscription ID as fallback (for subscription-level pages)
         const subscriptionMatch = decodedUrl.match(PORTAL_URL_PATTERNS.SUBSCRIPTION_ID);
         if (subscriptionMatch) {
           result.resourceId = `/subscriptions/${subscriptionMatch[1]}`;
-          console.log('[BetterPortal] Extracted subscription ID:', result.resourceId);
         }
       }
     }
@@ -151,7 +149,6 @@ export function isResourcePage(url: string): boolean {
     isResource = true;
   }
 
-  console.log('[BetterPortal] isResourcePage:', isResource, 'URL:', url.substring(0, 100));
   return isResource;
 }
 
@@ -358,7 +355,6 @@ function extractTenantFromPageContext(): string | null {
   // Read the result written by page-context.ts (MAIN world)
   const result = document.documentElement.getAttribute(ATTR_NAME);
   if (result) {
-    console.log('[BetterPortal] Got tenant GUID from page context:', result);
     return result;
   }
 
@@ -369,15 +365,11 @@ function extractTenantFromPageContext(): string | null {
  * Try to get tenant GUID from various sources in the portal (single attempt)
  */
 function getTenantGuidFromPortalOnce(): string | null {
-  const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const url = window.location.href;
-
-  console.log('[BetterPortal] getTenantGuidFromPortal() called, URL:', url.substring(0, 150));
 
   // 1. Check URL path first (most reliable)
   const urlPathMatch = url.match(/portal\.azure\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
   if (urlPathMatch) {
-    console.log('[BetterPortal] Found tenant GUID in URL path:', urlPathMatch[1]);
     return urlPathMatch[1];
   }
 
@@ -388,7 +380,6 @@ function getTenantGuidFromPortalOnce(): string | null {
     for (const param of directoryParams) {
       const val = urlObj.searchParams.get(param);
       if (val && guidRegex.test(val)) {
-        console.log('[BetterPortal] Found tenant GUID in query param:', param, '=', val);
         return val;
       }
     }
@@ -409,7 +400,6 @@ function getTenantGuidFromPortalOnce(): string | null {
     // Get the current URL domain to match against tokens
     const urlDomainMatch = url.match(/#@([^/#]+)/);
     const currentDomain = urlDomainMatch ? urlDomainMatch[1].toLowerCase() : null;
-    console.log('[BetterPortal] Looking for MSAL tokens, current domain:', currentDomain);
 
     // Collect all found GUIDs with their domains for smart matching
     const foundTokens: Array<{ guid: string; domain: string | null; key: string }> = [];
@@ -526,25 +516,21 @@ function getTenantGuidFromPortalOnce(): string | null {
       }
     }
 
-    console.log('[BetterPortal] Found', foundTokens.length, 'MSAL tokens');
-
     // Now find the best matching token
     if (foundTokens.length > 0) {
       // First priority: token with domain matching current URL domain
       if (currentDomain) {
         const matchingToken = foundTokens.find(t => t.domain === currentDomain);
         if (matchingToken) {
-          console.log('[BetterPortal] Found MSAL token matching current domain:', matchingToken.guid, 'key:', matchingToken.key);
           return matchingToken.guid;
         }
       }
 
       // Second priority: any token (may be wrong after directory switch)
-      console.log('[BetterPortal] No domain match, using first MSAL token:', foundTokens[0].guid, '(may be wrong tenant!)');
       return foundTokens[0].guid;
     }
   } catch (e) {
-    console.log('[BetterPortal] Error searching MSAL tokens:', e);
+    console.error('[BetterPortal] Error searching MSAL tokens:', e);
   }
 
   // 4. Check sessionStorage and localStorage for direct tenant keys
@@ -553,12 +539,10 @@ function getTenantGuidFromPortalOnce(): string | null {
     for (const key of storageKeys) {
       const sessionVal = sessionStorage.getItem(key);
       if (sessionVal && guidRegex.test(sessionVal)) {
-        console.log('[BetterPortal] Found tenant GUID in sessionStorage:', sessionVal);
         return sessionVal;
       }
       const localVal = localStorage.getItem(key);
       if (localVal && guidRegex.test(localVal)) {
-        console.log('[BetterPortal] Found tenant GUID in localStorage:', localVal);
         return localVal;
       }
     }
@@ -574,12 +558,10 @@ function getTenantGuidFromPortalOnce(): string | null {
             const parsed = JSON.parse(val);
             const id = parsed.tenantId || parsed.id || parsed.directoryId;
             if (id && guidRegex.test(id)) {
-              console.log('[BetterPortal] Found tenant GUID in sessionStorage JSON:', id, 'key:', key);
               return id;
             }
           } catch {
             if (guidRegex.test(val)) {
-              console.log('[BetterPortal] Found tenant GUID in sessionStorage:', val, 'key:', key);
               return val;
             }
           }
@@ -595,7 +577,6 @@ function getTenantGuidFromPortalOnce(): string | null {
   for (const el of dataAttrs) {
     const val = el.getAttribute('data-tenant-id') || el.getAttribute('data-tenantid') || el.getAttribute('data-directory-id');
     if (val && guidRegex.test(val)) {
-      console.log('[BetterPortal] Found tenant GUID in data attribute:', val);
       return val;
     }
   }
@@ -607,7 +588,6 @@ function getTenantGuidFromPortalOnce(): string | null {
       const src = iframe.src || '';
       const iframeMatch = src.match(/tenant[Ii]d[=\/]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
       if (iframeMatch) {
-        console.log('[BetterPortal] Found tenant GUID in iframe src:', iframeMatch[1]);
         return iframeMatch[1];
       }
     }
@@ -615,7 +595,6 @@ function getTenantGuidFromPortalOnce(): string | null {
     // Ignore iframe access errors
   }
 
-  console.log('[BetterPortal] Could not find tenant GUID in DOM/storage');
   return null;
 }
 
@@ -628,34 +607,27 @@ export async function getTenantGuidFromPortalWithRetry(
   maxRetries: number = 5,
   initialDelayMs: number = 300
 ): Promise<string | null> {
-  console.log('[BetterPortal] Getting tenant GUID with retry (max attempts:', maxRetries, ')');
-
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    // Try to get the GUID
     const guid = getTenantGuidFromPortalOnce();
 
     if (guid) {
-      console.log('[BetterPortal] Found tenant GUID on attempt', attempt + 1, ':', guid);
       return guid;
     }
 
     // If this isn't the last attempt, wait before retrying
     if (attempt < maxRetries - 1) {
       const delay = initialDelayMs * Math.pow(1.5, attempt); // Exponential backoff
-      console.log('[BetterPortal] Tenant GUID not found, waiting', Math.round(delay), 'ms before retry', attempt + 2);
       await new Promise(resolve => setTimeout(resolve, delay));
 
       // Check if URL has changed (might have GUID now after redirect)
       const newUrl = window.location.href;
       const urlGuidMatch = newUrl.match(/portal\.azure\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
       if (urlGuidMatch) {
-        console.log('[BetterPortal] Found tenant GUID in URL after waiting:', urlGuidMatch[1]);
         return urlGuidMatch[1];
       }
     }
   }
 
-  console.log('[BetterPortal] Could not find tenant GUID after', maxRetries, 'attempts');
   return null;
 }
 
@@ -724,7 +696,6 @@ export function getResourceNameFromDOM(): string | null {
           // Strip blade suffix like "| Overview"
           name = stripBladeSuffix(name);
           if (!isGuid(name)) {
-            console.log('[BetterPortal] Found resource name via selector:', selector, '->', name);
             return name;
           }
         }
@@ -742,13 +713,11 @@ export function getResourceNameFromDOM(): string | null {
     if (match) {
       let name = stripBladeSuffix(match[1].trim());
       if (name && !isGuid(name)) {
-        console.log('[BetterPortal] Found resource name via page title:', name);
         return name;
       }
     }
   }
 
-  console.log('[BetterPortal] Could not find resource name in DOM');
   return null;
 }
 

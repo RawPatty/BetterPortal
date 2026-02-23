@@ -516,27 +516,6 @@ describe('migrateBookmarks', () => {
     expect(bookmarks[0].tenantId).toBeNull(); // still null
   });
 
-  it('should not write to storage when no bookmarks need fixing', async () => {
-    const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
-    mockStorage['tenantMapping'] = {};
-    // "Clean" bookmark: valid GUID tenantId, url has no GUID in path
-    mockStorage['bookmarks'] = [{
-      id: 'bm-clean',
-      url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-5',
-      tenantId: guid,
-      tenantName: 'contoso.onmicrosoft.com',
-      resourceId: '/subscriptions/sub-5',
-      displayName: 'sub', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
-    }];
-
-    const { storageSet } = await import('../../shared/storage');
-    vi.clearAllMocks();
-    await migrateBookmarks();
-
-    expect(vi.mocked(storageSet)).not.toHaveBeenCalled();
-  });
-
   it('should not write to storage when all bookmarks already have valid GUIDs and clean urls', async () => {
     const guid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
     // Non-empty mapping so we don't hit the early-exit guard

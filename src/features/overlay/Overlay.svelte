@@ -51,8 +51,6 @@
   $: currentItem = flatItems[$selectedIndex];
 
   onMount(() => {
-    console.log('[BetterPortal] Overlay component mounted');
-
     // Listen for toggle event from content script
     window.addEventListener('betterportal:toggle', handleToggle);
 
@@ -70,8 +68,6 @@
 
     // Initialize settings
     overlayActions.refresh();
-
-    console.log('[BetterPortal] Keyboard listener registered');
   });
 
   onDestroy(() => {
@@ -247,7 +243,6 @@
 
       case '?':
         event.preventDefault();
-        console.log('[BetterPortal] Opening settings panel');
         showSettings = true;
         break;
     }

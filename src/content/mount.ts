@@ -24,8 +24,6 @@ export function mountOverlay() {
     target: container,
   });
 
-  console.log('[BetterPortal] Overlay mounted');
-
   return overlayInstance;
 }
 

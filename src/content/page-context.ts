@@ -73,9 +73,6 @@
     const guid = extractGuid();
     if (guid) {
       document.documentElement.setAttribute(ATTR_NAME, guid);
-      console.log('[BetterPortal] Page context found tenant GUID:', guid);
-    } else {
-      console.log('[BetterPortal] Page context could not find tenant GUID');
     }
   });
 })();

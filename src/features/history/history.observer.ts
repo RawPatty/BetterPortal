@@ -24,8 +24,6 @@ export function initHistoryObserver(): void {
     return;
   }
 
-  console.log('[BetterPortal] Initializing history observer');
-
   // Track current URL
   lastUrl = window.location.href;
 
@@ -98,16 +96,12 @@ async function captureCurrentPage(): Promise<void> {
 
   // Only capture resource pages
   if (!isResourcePage(url)) {
-    console.log('[BetterPortal] Skipping non-resource page:', url);
     return;
   }
 
   try {
     // Capture in history only (no auto-bookmark - user must explicitly bookmark)
-    const entry = await historyStore.upsert(url);
-    if (entry) {
-      console.log('[BetterPortal] History captured:', entry.displayName);
-    }
+    await historyStore.upsert(url);
 
     // Dispatch event for overlay to refresh if open
     window.dispatchEvent(new CustomEvent('betterportal:navigation'));

@@ -62,6 +62,9 @@ export const THEME_VARS = {
   WARNING: '--bp-warning',
 };
 
+// GUID regex pattern (used for tenant ID validation)
+export const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // History debounce time (ms) before capturing navigation
 export const HISTORY_DEBOUNCE_MS = 2000;
 

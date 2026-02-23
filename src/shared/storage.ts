@@ -229,7 +229,6 @@ export async function runMigrations(): Promise<void> {
     const storedVersion = versions[versionKey] ?? 0;
 
     if (storedVersion < currentVersion) {
-      console.log(`[BetterPortal] Migrating ${key} from v${storedVersion} to v${currentVersion}`);
       await migrateSchema(key as keyof typeof SCHEMA_VERSIONS, storedVersion, currentVersion);
       await storageSet(versionKey as StorageKey, currentVersion as any);
     }

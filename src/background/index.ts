@@ -1,12 +1,8 @@
 // BetterPortal Background Service Worker
 // Handles extension lifecycle and message passing
 
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') {
-    console.log('[BetterPortal] Extension installed');
-  } else if (details.reason === 'update') {
-    console.log('[BetterPortal] Extension updated');
-  }
+chrome.runtime.onInstalled.addListener((_details) => {
+  // Extension install/update lifecycle - no action needed
 });
 
 // Listen for messages from content script

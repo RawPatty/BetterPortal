@@ -1,30 +1,13 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, buildNavigationUrl, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { updateTenantMapping, lookupTenantGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
-import { MAX_ITEMS } from '../../shared/constants';
-
-// Cache for domain → GUID mapping (shared with bookmarks store via storage)
-type TenantMapping = Record<string, string>;
-
-async function getTenantMapping(): Promise<TenantMapping> {
-  const mapping = await storageGet('tenantMapping' as any);
-  return mapping || {};
-}
-
-async function saveTenantMapping(mapping: TenantMapping): Promise<void> {
-  await storageSet('tenantMapping' as any, mapping);
-}
+import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
 
 async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
-  if (!tenantGuid || !tenantDomain) return;
-  const mapping = await getTenantMapping();
-  const isNew = mapping[tenantDomain] !== tenantGuid;
-  if (isNew) {
-    mapping[tenantDomain] = tenantGuid;
-    await saveTenantMapping(mapping);
-  }
+  await updateTenantMapping(tenantGuid, tenantDomain);
 
   // Backfill existing history entries that have null tenantId for this domain.
   // Only update tenantId — never the url field; the GUID is injected at navigation/copy time.
@@ -39,15 +22,8 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     }
     if (updated) {
       await storageSet('history', history);
-      console.log('[BetterPortal] Backfilled null history tenantIds for domain:', tenantDomain);
     }
   }
-}
-
-async function lookupTenantGuid(tenantDomain: string): Promise<string | null> {
-  if (!tenantDomain) return null;
-  const mapping = await getTenantMapping();
-  return mapping[tenantDomain] || null;
 }
 
 // Delay before extracting DOM name to allow page to render
@@ -121,12 +97,11 @@ export const historyStore = {
       // because MSAL caches tokens for ALL tenants, not just the current one.
 
       const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
-      const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
       // Determine effective tenant ID for navigation - MUST be a GUID or null
       let effectiveTenantId: string | null = null;
 
-      if (parsed.tenantId && guidRegex.test(parsed.tenantId)) {
+      if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
         // URL has GUID in path - most reliable source
         effectiveTenantId = parsed.tenantId;
         // Cache this mapping since it came from URL (reliable)
@@ -139,7 +114,6 @@ export const historyStore = {
         if (!effectiveTenantId) {
           effectiveTenantId = getTenantGuidFromPortal();
           if (effectiveTenantId) {
-            console.log('[BetterPortal] History: Got tenant GUID from page context/MSAL:', effectiveTenantId);
             const domain = parsed.tenantDomain || effectiveTenantName;
             if (domain && domain !== 'Unknown Tenant') {
               await learnTenantMapping(effectiveTenantId, domain);
@@ -152,9 +126,6 @@ export const historyStore = {
           const domain = parsed.tenantDomain || effectiveTenantName;
           if (domain && domain !== 'Unknown Tenant') {
             effectiveTenantId = await lookupTenantGuid(domain);
-            if (effectiveTenantId) {
-              console.log('[BetterPortal] History: Got tenant GUID from cached mapping:', effectiveTenantId);
-            }
           }
         }
       }

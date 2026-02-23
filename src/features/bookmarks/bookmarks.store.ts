@@ -1,7 +1,7 @@
 // Bookmarks store for BetterPortal
 import { storageGet, storageSet, storageRemove, storageSyncGet, storageSyncSet, storageSyncRemove } from '../../shared/storage';
 import type { Bookmark, BookmarkSaveResult } from '../../shared/types';
-import { MAX_ITEMS } from '../../shared/constants';
+import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
 import {
   parsePortalUrl,
   getTenantNameFromDOM,
@@ -16,8 +16,6 @@ import {
   getTenantGuidFromPortal,
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
-
-const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Cache for domain → GUID mapping (learned from URLs)
 // This persists so we can look up GUIDs for domains we've seen before
@@ -55,18 +53,24 @@ async function writeBookmarks(bookmarks: Bookmark[]): Promise<void> {
 }
 
 /**
- * Learn and cache the domain → GUID mapping from a URL
- * When URL has both GUID in path and domain in hash, we can learn the mapping
+ * Update the shared domain → GUID mapping in storage.
+ * Exported so history store can use the same cache without duplicating storage logic.
  */
-async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
+export async function updateTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
   if (!tenantGuid || !tenantDomain) return;
-
   const mapping = await getTenantMapping();
-  const isNew = mapping[tenantDomain] !== tenantGuid;
-  if (isNew) {
+  if (mapping[tenantDomain] !== tenantGuid) {
     mapping[tenantDomain] = tenantGuid;
     await saveTenantMapping(mapping);
   }
+}
+
+/**
+ * Learn and cache the domain → GUID mapping from a URL, then backfill bookmarks.
+ * When URL has both GUID in path and domain in hash, we can learn the mapping.
+ */
+async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Promise<void> {
+  await updateTenantMapping(tenantGuid, tenantDomain);
 
   // Backfill existing bookmarks that have null or domain-string tenantId for this domain.
   // Only update tenantId — never the url field; the GUID is injected at navigation/copy time.
@@ -82,7 +86,6 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
     }
     if (updated) {
       await writeBookmarks(bookmarks);
-      console.log('[BetterPortal] Backfilled missing or invalid tenantIds for domain:', tenantDomain);
     }
   }
 }
@@ -119,7 +122,6 @@ export async function migrateBookmarks(): Promise<void> {
         if (guid) {
           bookmark.tenantId = guid;
           updated = true;
-          console.log('[BetterPortal] Migrated bookmark tenantId:', bookmark.id, 'domain:', domain, '-> GUID:', guid);
         }
       }
     }
@@ -130,14 +132,34 @@ export async function migrateBookmarks(): Promise<void> {
     if (strippedUrl !== bookmark.url) {
       bookmark.url = strippedUrl;
       updated = true;
-      console.log('[BetterPortal] Stripped GUID from stored bookmark url:', bookmark.id);
     }
   }
 
   if (updated) {
     await writeBookmarks(bookmarks);
-    console.log('[BetterPortal] Bookmark migration complete');
   }
+}
+
+/**
+ * Resolve the correct navigation URL for an item and navigate to it.
+ * Handles same-directory (no redirect) vs cross-directory (inject GUID) logic.
+ */
+export async function navigateToItem(url: string, tenantId: string | null, tenantName: string | null): Promise<void> {
+  const currentDir = getCurrentDirectoryInfo();
+  const domain = tenantName?.toLowerCase() || null;
+  const sameDirectory = isSameDirectory(currentDir.domain, domain);
+
+  let tenantGuid = tenantId;
+  if (!tenantGuid && domain) {
+    tenantGuid = await lookupTenantGuid(domain);
+  }
+
+  let navigationUrl = url;
+  if (!sameDirectory && tenantGuid) {
+    navigationUrl = buildNavigationUrl(url, tenantGuid);
+  }
+
+  window.location.href = navigationUrl;
 }
 
 export const bookmarkStore = {
@@ -226,10 +248,8 @@ export const bookmarkStore = {
       } else {
         displayName = domName;
       }
-      console.log('[BetterPortal] Bookmark using DOM name:', displayName, isGuid ? '(URL was GUID)' : '(matched URL)');
     } else {
       displayName = urlDisplayName;
-      console.log('[BetterPortal] Bookmark using URL display name:', urlDisplayName, '(DOM was:', domName, ')');
     }
 
     // Determine tenant ID for navigation (MUST be GUID) and tenant name for grouping
@@ -257,16 +277,13 @@ export const bookmarkStore = {
       if (parsed.tenantDomain) {
         await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
       }
-      console.log('[BetterPortal] Using GUID from URL path (reliable):', effectiveTenantId);
     } else {
       // URL does not have GUID in path - try fallbacks
-      console.log('[BetterPortal] No GUID in URL path - trying fallbacks');
 
       // Fallback 1: Try page context / MSAL — reliable for current page's tenant at save time
       if (!effectiveTenantId) {
         effectiveTenantId = getTenantGuidFromPortal();
         if (effectiveTenantId) {
-          console.log('[BetterPortal] Got tenant GUID from page context/MSAL:', effectiveTenantId);
           const domain = parsed.tenantDomain || effectiveTenantName;
           if (domain && domain !== 'Unknown Tenant') {
             await learnTenantMapping(effectiveTenantId, domain);
@@ -279,27 +296,13 @@ export const bookmarkStore = {
         const domain = parsed.tenantDomain || effectiveTenantName;
         if (domain && domain !== 'Unknown Tenant') {
           effectiveTenantId = await lookupTenantGuid(domain);
-          if (effectiveTenantId) {
-            console.log('[BetterPortal] Got tenant GUID from cached mapping:', effectiveTenantId);
-          }
         }
-      }
-
-      if (!effectiveTenantId) {
-        console.log('[BetterPortal] No tenant GUID available from any source');
       }
     }
 
     // Strip any tenant GUID from the stored URL — the url field should be the canonical
     // resource URL. The GUID is stored separately in tenantId and injected at navigation/copy time.
     finalUrl = stripTenantGuidFromUrl(finalUrl);
-
-    console.log('[BetterPortal] Bookmark tenant detection:', {
-      urlTenantId: parsed.tenantId,
-      urlDomain: parsed.tenantDomain,
-      effectiveId: effectiveTenantId,
-      effectiveName: effectiveTenantName
-    });
 
     const bookmark: Bookmark = {
       id: crypto.randomUUID(),
@@ -416,36 +419,7 @@ export const bookmarkStore = {
       accessCount: bookmark.accessCount + 1,
     });
 
-    // Determine correct tenant GUID to use for navigation
-    const currentDir = getCurrentDirectoryInfo();
-    const bookmarkDomain = bookmark.tenantName?.toLowerCase() || null;
-    const sameDirectory = isSameDirectory(currentDir.domain, bookmarkDomain);
-
-    // Get bookmark's tenant GUID - prefer stored tenantId, fallback to cached mapping
-    let bookmarkTenantGuid = bookmark.tenantId;
-    if (!bookmarkTenantGuid && bookmarkDomain) {
-      bookmarkTenantGuid = await lookupTenantGuid(bookmarkDomain);
-    }
-
-    // Determine navigation URL based on directory context
-    let navigationUrl = bookmark.url;
-
-    if (sameDirectory) {
-      // Same directory: use original URL without GUID injection
-      // This avoids redirect flash when already in the correct tenant context
-      console.log('[BetterPortal] Same directory navigation - using original URL (no redirect)');
-    } else {
-      // Different directory: inject target GUID for cross-tenant navigation
-      if (bookmarkTenantGuid) {
-        navigationUrl = buildNavigationUrl(bookmark.url, bookmarkTenantGuid);
-        console.log('[BetterPortal] Cross-directory navigation - injecting target GUID:', bookmarkTenantGuid);
-      } else {
-        console.log('[BetterPortal] Cross-directory navigation requested but no GUID available - using original URL');
-      }
-    }
-
-    // Navigate
-    window.location.href = navigationUrl;
+    await navigateToItem(bookmark.url, bookmark.tenantId, bookmark.tenantName);
   },
 
   /**

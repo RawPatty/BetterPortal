@@ -1,14 +1,10 @@
 // Overlay state management
 import { writable, derived, get } from 'svelte/store';
 import type { Bookmark, HistoryEntry, OverlayMode, Settings } from '../../shared/types';
-import { bookmarkStore, lookupTenantGuid } from '../bookmarks/bookmarks.store';
+import { bookmarkStore, navigateToItem } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { historyStore } from '../history/history.store';
-import {
-  getCurrentDirectoryInfo,
-  isSameDirectory,
-  buildNavigationUrl,
-} from '../bookmarks/url-parser';
+import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { storageSyncGet, storageSyncSet } from '../../shared/storage';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -211,7 +207,6 @@ export const overlayActions = {
         storageSyncGet('tenantAliases'),
       ]);
 
-      console.log('[BetterPortal] Loaded', bookmarkData.length, 'bookmarks');
       bookmarks.set(bookmarkData);
       settings.set(settingsData);
       tenantAliases.set(tenantAliasData || {});
@@ -220,7 +215,6 @@ export const overlayActions = {
       try {
         const limit = settingsData.historyMaxEntries || 500;
         const historyData = await historyStore.getRecent(limit);
-        console.log('[BetterPortal] Loaded', historyData.length, 'history items (limit:', limit, ')');
         history.set(historyData);
       } catch {
         // History store may not be loaded yet
@@ -267,35 +261,7 @@ export const overlayActions = {
     if (item.type === 'bookmark') {
       await bookmarkStore.navigate(item.id);
     } else {
-      // Navigate to history item - determine correct tenant GUID to use
-      const currentDir = getCurrentDirectoryInfo();
-      const itemDomain = item.tenantName?.toLowerCase() || null;
-      const sameDirectory = isSameDirectory(currentDir.domain, itemDomain);
-
-      // Get item's tenant GUID - prefer stored tenantId, fallback to cached mapping
-      let itemTenantGuid = item.tenantId;
-      if (!itemTenantGuid && itemDomain) {
-        itemTenantGuid = await lookupTenantGuid(itemDomain);
-      }
-
-      // Determine navigation URL based on directory context
-      let navigationUrl = item.url;
-
-      if (sameDirectory) {
-        // Same directory: use original URL without GUID injection
-        // This avoids redirect flash when already in the correct tenant context
-        console.log('[BetterPortal] Same directory navigation - using original URL (no redirect)');
-      } else {
-        // Different directory: inject target GUID for cross-tenant navigation
-        if (itemTenantGuid) {
-          navigationUrl = buildNavigationUrl(item.url, itemTenantGuid);
-          console.log('[BetterPortal] Cross-directory navigation - injecting target GUID:', itemTenantGuid);
-        } else {
-          console.log('[BetterPortal] Cross-directory navigation requested but no GUID available - using original URL');
-        }
-      }
-
-      window.location.href = navigationUrl;
+      await navigateToItem(item.url, item.tenantId, item.tenantName);
     }
 
     this.close();
@@ -310,11 +276,8 @@ export const overlayActions = {
     const item = items[index];
 
     if (!item) {
-      console.log('[BetterPortal] No item selected to delete');
       return;
     }
-
-    console.log('[BetterPortal] Deleting item:', item.type, item.displayName);
 
     if (item.type === 'bookmark') {
       // Delete bookmark AND corresponding history entry (so it doesn't reappear as history)

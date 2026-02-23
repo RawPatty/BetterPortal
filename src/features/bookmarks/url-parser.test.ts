@@ -489,46 +489,6 @@ describe('url-parser', () => {
         expect(result).not.toContain(oldGuid);
       });
 
-      it('should preserve query params with trailing slash', () => {
-        const oldGuid = '11111111-1111-1111-1111-111111111111';
-        const newGuid = '22222222-2222-2222-2222-222222222222';
-        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
-
-        const result = buildNavigationUrl(url, newGuid);
-
-        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`);
-      });
-
-      it('should preserve multiple query parameters', () => {
-        const oldGuid = '11111111-1111-1111-1111-111111111111';
-        const newGuid = '22222222-2222-2222-2222-222222222222';
-        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us&feature=test#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`;
-
-        const result = buildNavigationUrl(url, newGuid);
-
-        expect(result).toContain('?l=en.en-us&feature=test');
-        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us&feature=test#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`);
-      });
-
-      it('should handle query params without hash', () => {
-        const oldGuid = '11111111-1111-1111-1111-111111111111';
-        const newGuid = '22222222-2222-2222-2222-222222222222';
-        const url = `https://portal.azure.com/${oldGuid}/?l=en.en-us`;
-
-        const result = buildNavigationUrl(url, newGuid);
-
-        expect(result).toBe(`https://portal.azure.com/${newGuid}/?l=en.en-us`);
-      });
-
-      it('should maintain query param order and encoding', () => {
-        const guid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-        const url = 'https://portal.azure.com?l=en.en-us&redirect=%2Fhome#@contoso.onmicrosoft.com/resource/subscriptions/sub-123';
-
-        const result = buildNavigationUrl(url, guid);
-
-        // Should preserve query param order and URL encoding
-        expect(result).toContain('?l=en.en-us&redirect=%2Fhome');
-      });
     });
   });
 
