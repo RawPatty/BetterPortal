@@ -496,13 +496,14 @@ describe('url-parser', () => {
 
   describe('getCurrentDirectoryInfo', () => {
     afterEach(() => {
-      document.querySelectorAll('.fxs-avatarmenu-tenant-name').forEach(el => el.remove());
+      document.querySelectorAll('.fxs-avatarmenu-tenant').forEach(el => el.remove());
     });
 
-    it('should fall back to DOM tenant name when URL has no #@ (e.g. #home page)', () => {
-      const el = document.createElement('span');
-      el.className = 'fxs-avatarmenu-tenant-name';
-      el.textContent = 'contoso.onmicrosoft.com';
+    it('should fall back to DOM tenant domain when URL has no #@ (e.g. #home page)', () => {
+      // Azure Portal format: "Display Name (domain.onmicrosoft.com)"
+      const el = document.createElement('div');
+      el.className = 'fxs-avatarmenu-tenant';
+      el.textContent = 'Contoso Corp (contoso.onmicrosoft.com)';
       document.body.appendChild(el);
 
       const result = getCurrentDirectoryInfo();

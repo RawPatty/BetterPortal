@@ -309,7 +309,12 @@ export function generateDisplayName(resourceId: string, blade: string | null): s
 export function getTenantNameFromDOM(): string | null {
   const element = document.querySelector(PORTAL_SELECTORS.TENANT_NAME);
   if (element) {
-    return element.textContent?.trim() || null;
+    const text = element.textContent?.trim() || null;
+    if (!text) return null;
+    // Azure Portal format: "Display Name (domain.onmicrosoft.com)" — extract just the domain
+    const domainMatch = text.match(/\(([^)]+)\)$/);
+    if (domainMatch) return domainMatch[1];
+    return text;
   }
   return null;
 }

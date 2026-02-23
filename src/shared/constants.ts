@@ -27,8 +27,8 @@ export const PORTAL_URL_PATTERNS = {
 
 // DOM selectors for Azure Portal
 export const PORTAL_SELECTORS = {
-  // Tenant name display
-  TENANT_NAME: '.fxs-avatarmenu-tenant-name, [data-telemetryname="DirectoryMenu"]',
+  // Tenant name display (format: "Display Name (domain.onmicrosoft.com)")
+  TENANT_NAME: '.fxs-avatarmenu-tenant, .fxs-settings-currentdirectoryname',
 
   // Resource name in breadcrumb
   RESOURCE_NAME: '.fxs-blade-title-titleText',
