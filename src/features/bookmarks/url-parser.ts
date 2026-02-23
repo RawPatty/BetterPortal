@@ -17,7 +17,10 @@ export function getCurrentDirectoryInfo(): { domain: string | null; guid: string
   const guidMatch = url.match(PORTAL_URL_PATTERNS.TENANT_ID);
   const guid = guidMatch ? guidMatch[1] : null;
 
-  return { domain, guid };
+  // Fall back to DOM tenant name when URL doesn't expose the directory (e.g., #home page)
+  const resolvedDomain = domain || (getTenantNameFromDOM()?.toLowerCase() ?? null);
+
+  return { domain: resolvedDomain, guid };
 }
 
 /**

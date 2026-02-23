@@ -12,6 +12,7 @@ import {
   buildNavigationUrl,
   stripTenantGuidFromUrl,
   getTenantGuidFromPortal,
+  getCurrentDirectoryInfo,
 } from './url-parser';
 
 describe('url-parser', () => {
@@ -490,6 +491,28 @@ describe('url-parser', () => {
         expect(result).not.toContain(oldGuid);
       });
 
+    });
+  });
+
+  describe('getCurrentDirectoryInfo', () => {
+    afterEach(() => {
+      document.querySelectorAll('.fxs-avatarmenu-tenant-name').forEach(el => el.remove());
+    });
+
+    it('should fall back to DOM tenant name when URL has no #@ (e.g. #home page)', () => {
+      const el = document.createElement('span');
+      el.className = 'fxs-avatarmenu-tenant-name';
+      el.textContent = 'contoso.onmicrosoft.com';
+      document.body.appendChild(el);
+
+      const result = getCurrentDirectoryInfo();
+
+      expect(result.domain).toBe('contoso.onmicrosoft.com');
+    });
+
+    it('should return null domain when URL has no #@ and no DOM tenant name', () => {
+      const result = getCurrentDirectoryInfo();
+      expect(result.domain).toBeNull();
     });
   });
 
