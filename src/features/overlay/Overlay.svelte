@@ -167,10 +167,12 @@
         overlayActions.selectCurrent();
       } else if (event.key === 'ArrowDown') {
         event.preventDefault();
+        searchInputRef?.blur();
         overlayActions.moveDown();
         scrollToSelected();
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
+        searchInputRef?.blur();
         overlayActions.moveUp();
         scrollToSelected();
       }
@@ -200,8 +202,12 @@
 
       case 'ArrowUp':
         event.preventDefault();
-        overlayActions.moveUp();
-        scrollToSelected();
+        if ($selectedIndex === 0) {
+          setTimeout(() => searchInputRef?.focus(), 0);
+        } else {
+          overlayActions.moveUp();
+          scrollToSelected();
+        }
         break;
 
       case 'Enter':
