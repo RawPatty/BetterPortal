@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   parsePortalUrl,
   isResourcePage,
@@ -11,6 +11,7 @@ import {
   isSubscriptionResource,
   buildNavigationUrl,
   stripTenantGuidFromUrl,
+  getTenantGuidFromPortal,
 } from './url-parser';
 
 describe('url-parser', () => {
@@ -489,6 +490,25 @@ describe('url-parser', () => {
         expect(result).not.toContain(oldGuid);
       });
 
+    });
+  });
+
+  describe('getTenantGuidFromPortal', () => {
+    beforeEach(() => sessionStorage.clear());
+    afterEach(() => sessionStorage.clear());
+
+    it('should return GUID from sessionStorage MSAL token when URL has no GUID in path', () => {
+      const guid = 'abcdef12-1234-1234-1234-123456789abc';
+      // Build a minimal JWT with tid claim (header.payload.signature)
+      const header = btoa('{"alg":"none"}');
+      const payload = btoa(JSON.stringify({ tid: guid }));
+      const fakeToken = `${header}.${payload}.fakesignature`;
+
+      sessionStorage.setItem('msal.idtoken', fakeToken);
+
+      const result = getTenantGuidFromPortal();
+
+      expect(result).toBe(guid);
     });
   });
 

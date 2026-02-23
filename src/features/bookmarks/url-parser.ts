@@ -379,7 +379,7 @@ function getTenantGuidFromPortalOnce(): string | null {
     const directoryParams = ['directory', 'feature.directory', 'tid', 'tenantId', 'tenant'];
     for (const param of directoryParams) {
       const val = urlObj.searchParams.get(param);
-      if (val && guidRegex.test(val)) {
+      if (val && GUID_REGEX.test(val)) {
         return val;
       }
     }
@@ -426,7 +426,7 @@ function getTenantGuidFromPortalOnce(): string | null {
             // Can't get domain from issuer GUID, but tid is the same
           }
         }
-        if (tid && guidRegex.test(tid)) {
+        if (tid && GUID_REGEX.test(tid)) {
           return { guid: tid, domain };
         }
       } catch {
@@ -474,7 +474,7 @@ function getTenantGuidFromPortalOnce(): string | null {
           }
           // Direct tenantId in object
           const directTid = parsed.tenantId || parsed.tid || parsed.realm;
-          if (directTid && guidRegex.test(directTid)) {
+          if (directTid && GUID_REGEX.test(directTid)) {
             foundTokens.push({ guid: directTid, domain: keyDomain, key });
           }
         } catch {
@@ -507,7 +507,7 @@ function getTenantGuidFromPortalOnce(): string | null {
         try {
           const parsed = JSON.parse(val);
           const directTid = parsed.tenantId || parsed.tid || parsed.realm;
-          if (directTid && guidRegex.test(directTid)) {
+          if (directTid && GUID_REGEX.test(directTid)) {
             foundTokens.push({ guid: directTid, domain: keyDomain, key: `localStorage.${key}` });
           }
         } catch {
@@ -538,11 +538,11 @@ function getTenantGuidFromPortalOnce(): string | null {
     const storageKeys = ['tenantId', 'tenant_id', 'currentTenant', 'selectedTenant', 'directory'];
     for (const key of storageKeys) {
       const sessionVal = sessionStorage.getItem(key);
-      if (sessionVal && guidRegex.test(sessionVal)) {
+      if (sessionVal && GUID_REGEX.test(sessionVal)) {
         return sessionVal;
       }
       const localVal = localStorage.getItem(key);
-      if (localVal && guidRegex.test(localVal)) {
+      if (localVal && GUID_REGEX.test(localVal)) {
         return localVal;
       }
     }
@@ -557,11 +557,11 @@ function getTenantGuidFromPortalOnce(): string | null {
           try {
             const parsed = JSON.parse(val);
             const id = parsed.tenantId || parsed.id || parsed.directoryId;
-            if (id && guidRegex.test(id)) {
+            if (id && GUID_REGEX.test(id)) {
               return id;
             }
           } catch {
-            if (guidRegex.test(val)) {
+            if (GUID_REGEX.test(val)) {
               return val;
             }
           }
@@ -576,7 +576,7 @@ function getTenantGuidFromPortalOnce(): string | null {
   const dataAttrs = document.querySelectorAll('[data-tenant-id], [data-tenantid], [data-directory-id]');
   for (const el of dataAttrs) {
     const val = el.getAttribute('data-tenant-id') || el.getAttribute('data-tenantid') || el.getAttribute('data-directory-id');
-    if (val && guidRegex.test(val)) {
+    if (val && GUID_REGEX.test(val)) {
       return val;
     }
   }
