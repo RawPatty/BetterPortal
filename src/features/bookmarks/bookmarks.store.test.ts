@@ -143,6 +143,56 @@ describe('bookmarkStore', () => {
       expect(result.success).toBe(true);
       if (result.success) expect(result.bookmark.tenantId).toBe(urlGuid);
     });
+
+    it('should use cached GUID when URL path GUID conflicts with hash domain (transitional state)', async () => {
+      // Bug scenario: portal.azure.com/A-guid/#@b-domain — URL path GUID is from source tenant,
+      // hash domain is the target tenant. Cache knows the correct GUID for b-domain.
+      const sourceGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // source tenant A (wrong for this resource)
+      const targetGuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // target tenant B (correct)
+
+      mockStorage['tenantMapping'] = {
+        'contoso.onmicrosoft.com': targetGuid,
+      };
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: sourceGuid,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: `https://portal.azure.com/${sourceGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`,
+      } as any);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Should use cached GUID for the hash domain, not the mismatched URL path GUID
+        expect(result.bookmark.tenantId).toBe(targetGuid);
+        expect(result.bookmark.tenantId).not.toBe(sourceGuid);
+      }
+    });
+
+    it('should use URL path GUID when it matches cached mapping (consistent URL)', async () => {
+      const urlGuid = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+      // Cache confirms urlGuid is the correct GUID for contoso — no conflict
+      mockStorage['tenantMapping'] = {
+        'contoso.onmicrosoft.com': urlGuid,
+      };
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: urlGuid,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: `https://portal.azure.com/${urlGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123`,
+      } as any);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(urlGuid);
+    });
   });
 
   describe('backfill null tenantIds on mapping learned', () => {

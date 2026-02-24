@@ -17,6 +17,7 @@
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
   import { buildNavigationUrl } from '../bookmarks/url-parser';
+  import { lookupTenantGuid } from '../bookmarks/bookmarks.store';
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
@@ -28,7 +29,11 @@
 
   async function copyItemUrl(item: any, event: MouseEvent) {
     event.stopPropagation();
-    const url = item.tenantId ? buildNavigationUrl(item.url, item.tenantId) : item.url;
+    // Prefer a fresh cache lookup over the stored tenantId — the cache is populated from
+    // reliable URL-path GUIDs, so it reflects the correct GUID for the item's directory
+    // even if item.tenantId was stored incorrectly (e.g. during a transitional URL state).
+    const tenantGuid = (item.tenantName ? await lookupTenantGuid(item.tenantName) : null) ?? item.tenantId;
+    const url = tenantGuid ? buildNavigationUrl(item.url, tenantGuid) : item.url;
     await navigator.clipboard.writeText(url);
     copiedItemId = item.id;
     setTimeout(() => { copiedItemId = null; }, 1500);

@@ -102,11 +102,23 @@ export const historyStore = {
       let effectiveTenantId: string | null = null;
 
       if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
-        // URL has GUID in path - most reliable source
-        effectiveTenantId = parsed.tenantId;
-        // Cache this mapping since it came from URL (reliable)
         if (parsed.tenantDomain) {
-          await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+          // Both GUID in path and domain in hash: verify they're consistent.
+          // A mismatch means the URL is in a transitional directory-switch state —
+          // the path GUID belongs to the source tenant, not the target domain.
+          const cachedGuid = await lookupTenantGuid(parsed.tenantDomain);
+          if (!cachedGuid || cachedGuid === parsed.tenantId) {
+            // Consistent (or first time seeing this domain): trust URL path GUID and cache it.
+            effectiveTenantId = parsed.tenantId;
+            await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+          } else {
+            // Conflict: URL path GUID is from a different tenant than the hash domain.
+            // Use the cached GUID (learned from a stable URL previously).
+            effectiveTenantId = cachedGuid;
+          }
+        } else {
+          // Only GUID in path, no domain in hash — trust it.
+          effectiveTenantId = parsed.tenantId;
         }
       } else {
         // URL does not have GUID in path - try fallbacks
