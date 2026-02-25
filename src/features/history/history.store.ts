@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getGuidForDomain, getCurrentDirectoryInfo, isSameDirectory, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getGuidForDomain, getCurrentDirectoryInfo, isSameDirectory, getTenantGuidFromPortal, getAuthenticatedTenantGuid } from '../bookmarks/url-parser';
 import { updateTenantMapping, lookupTenantGuid, lookupDomainForGuid, isGuidValidForDomain, removeTenantMappingEntry } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
@@ -109,16 +109,26 @@ export const historyStore = {
         const currentDir = getCurrentDirectoryInfo();
         const sameDir = isSameDirectory(currentDir.domain, itemDomain);
 
-        // 2. Page context — window.Portal.tenant.id — only for same-directory items.
-        //    Reject if the GUID maps to a different domain OR multiple domains (corrupt cache).
+        // 2. Fetch-intercepted MSAL GUID — most authoritative source.
+        //    page-context.ts captures the GUID from login.microsoftonline.com/{GUID}/oauth2 requests.
+        //    Only use for same-directory items.
         if (sameDir) {
+          const fetchGuid = getAuthenticatedTenantGuid();
+          if (fetchGuid) {
+            effectiveTenantId = fetchGuid;
+          }
+        }
+
+        // 3. Page context — window.Portal.tenant.id — only for same-directory items.
+        //    Reject if the GUID maps to a different domain OR multiple domains (corrupt cache).
+        if (!effectiveTenantId && sameDir) {
           const pageGuid = getTenantGuidFromPortal();
           if (pageGuid && await isGuidValidForDomain(pageGuid, itemDomain)) {
             effectiveTenantId = pageGuid;
           }
         }
 
-        // 3. MSAL token scan — domain-aware. Same validity check: guest tokens have
+        // 4. MSAL token scan — domain-aware. Same validity check: guest tokens have
         //    tid = HOME GUID but upn ending in @guest-tenant (false-positive domain match).
         if (!effectiveTenantId) {
           const msalGuid = getGuidForDomain(itemDomain);
@@ -127,7 +137,7 @@ export const historyStore = {
           }
         }
 
-        // 4. Tenant mapping cache — previously learned domain→GUID.
+        // 5. Tenant mapping cache — previously learned domain→GUID.
         //    Same validity check: corrupt cache may have the same GUID under multiple domains.
         //    If invalid, remove the bad entry so navigateToItem won't use it either.
         if (!effectiveTenantId) {

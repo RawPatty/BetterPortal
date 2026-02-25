@@ -14,6 +14,7 @@ import {
   stripTenantGuidFromUrl,
   getTenantGuidFromPortal,
   getCurrentDirectoryInfo,
+  getAuthenticatedTenantGuid,
 } from './url-parser';
 
 describe('url-parser', () => {
@@ -534,6 +535,25 @@ describe('url-parser', () => {
       const result = getTenantGuidFromPortal();
 
       expect(result).toBe(guid);
+    });
+  });
+
+  describe('getAuthenticatedTenantGuid', () => {
+    const ATTR = 'data-betterportal-current-tenant';
+
+    afterEach(() => {
+      document.documentElement.removeAttribute(ATTR);
+    });
+
+    it('returns GUID written to DOM attribute by fetch interception', () => {
+      const guid = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+      document.documentElement.setAttribute(ATTR, guid);
+      expect(getAuthenticatedTenantGuid()).toBe(guid);
+    });
+
+    it('returns null when attribute is absent', () => {
+      document.documentElement.removeAttribute(ATTR);
+      expect(getAuthenticatedTenantGuid()).toBeNull();
     });
   });
 

@@ -647,6 +647,17 @@ export function getTenantGuidFromPortal(): string | null {
 }
 
 /**
+ * Get the tenant GUID captured from the most recent MSAL token fetch request.
+ * page-context.ts (MAIN world) intercepts window.fetch and writes the GUID from
+ * login.microsoftonline.com/{GUID}/oauth2/v2.0/token URLs to this attribute.
+ * This is the most reliable source: it's directly from the OAuth2 endpoint URL.
+ */
+export function getAuthenticatedTenantGuid(): string | null {
+  const val = document.documentElement.getAttribute('data-betterportal-current-tenant');
+  return val && GUID_REGEX.test(val) ? val : null;
+}
+
+/**
  * Build a URL for copying to clipboard.
  * Inserts the item's stored tenantId (directory GUID) into the URL path
  * for cross-directory navigation. Always includes the GUID when available

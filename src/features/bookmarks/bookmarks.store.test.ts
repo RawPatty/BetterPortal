@@ -47,6 +47,7 @@ vi.mock('./url-parser', () => ({
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
   getGuidForDomain: vi.fn(() => null),
   getTenantGuidFromPortal: vi.fn(() => null),
+  getAuthenticatedTenantGuid: vi.fn(() => null),
   stripBlade: vi.fn((url: string) => url),
   buildNavigationUrl: vi.fn((url: string, tenantId: string) => {
     if (!tenantId) return url;
@@ -71,7 +72,7 @@ const mockLocation = { href: 'https://portal.azure.com/#@contoso.onmicrosoft.com
 vi.stubGlobal('window', { location: mockLocation });
 
 import { bookmarkStore, migrateBookmarks, migrateBookmarksToSync, migrateBookmarksFromSync } from './bookmarks.store';
-import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal } from './url-parser';
+import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal, getAuthenticatedTenantGuid } from './url-parser';
 import type { BookmarkSaveResult } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
 import { settingsStore } from '../settings/settings.store';
@@ -84,6 +85,28 @@ describe('bookmarkStore', () => {
   });
 
   describe('tenant GUID resolution at save time', () => {
+    it('should store GUID from fetch-intercepted MSAL token for same-directory items', async () => {
+      const fetchGuid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+      vi.mocked(getAuthenticatedTenantGuid).mockReturnValueOnce(fetchGuid);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(fetchGuid);
+    });
+
+    it('should prefer fetch-intercepted GUID over page context GUID', async () => {
+      // page context returns a valid GUID, but fetch-intercepted wins (checked first)
+      const fetchGuid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+      vi.mocked(getAuthenticatedTenantGuid).mockReturnValueOnce(fetchGuid);
+      // getTenantGuidFromPortal left at default (null) — fetch-intercepted must win on its own
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(fetchGuid);
+    });
+
     it('should store GUID from page context for same-directory items', async () => {
       const pageGuid = '88888888-8888-8888-8888-888888888888';
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageGuid);

@@ -6,7 +6,28 @@
  */
 (function () {
   const ATTR_NAME = 'data-betterportal-tenant-guid';
+  const CURRENT_TENANT_ATTR = 'data-betterportal-current-tenant';
   const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const msalTokenRegex = /login\.microsoftonline\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/oauth2/i;
+
+  // Intercept fetch to capture the authenticated tenant GUID from MSAL token requests.
+  // The GUID in login.microsoftonline.com/{GUID}/oauth2/v2.0/token is always the correct
+  // tenant being authenticated to — no JWT parsing or domain matching needed.
+  const origFetch = window.fetch.bind(window);
+  window.fetch = function (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> {
+    try {
+      const url = typeof args[0] === 'string' ? args[0]
+        : args[0] instanceof Request ? args[0].url
+        : '';
+      const match = url.match(msalTokenRegex);
+      if (match) {
+        document.documentElement.setAttribute(CURRENT_TENANT_ATTR, match[1]);
+      }
+    } catch {
+      // ignore
+    }
+    return origFetch(...args);
+  };
 
   function extractGuid(): string | null {
     const w = window as Record<string, unknown>;

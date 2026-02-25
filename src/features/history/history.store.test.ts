@@ -36,6 +36,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
   getGuidForDomain: vi.fn(() => null),
   getTenantGuidFromPortal: vi.fn(() => null),
+  getAuthenticatedTenantGuid: vi.fn(() => null),
   getCurrentDirectoryInfo: vi.fn(() => ({ domain: 'test.onmicrosoft.com', guid: null })),
   isSameDirectory: vi.fn((a: string | null, b: string | null) => a?.toLowerCase() === b?.toLowerCase()),
   isErrorPage: vi.fn(() => false), // Mock as not an error page by default
@@ -59,7 +60,7 @@ vi.mock('../bookmarks/url-parser', () => ({
 
 import { historyStore } from './history.store';
 import { storageGet, storageSet } from '../../shared/storage';
-import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal, getAuthenticatedTenantGuid } from '../bookmarks/url-parser';
 
 describe('historyStore', () => {
   beforeEach(() => {
@@ -442,6 +443,16 @@ describe('historyStore', () => {
   });
 
   describe('tenant GUID resolution at save time', () => {
+    it('should store GUID from fetch-intercepted MSAL token for same-directory items', async () => {
+      const fetchGuid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+      vi.mocked(getAuthenticatedTenantGuid).mockReturnValueOnce(fetchGuid);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result?.tenantId).toBe(fetchGuid);
+    });
+
     it('should store GUID from page context for same-directory items', async () => {
       const pageGuid = '88888888-8888-8888-8888-888888888888';
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageGuid);
