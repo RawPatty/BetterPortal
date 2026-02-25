@@ -68,6 +68,19 @@ export async function lookupDomainForGuid(guid: string): Promise<string | null> 
 }
 
 /**
+ * Remove a domain entry from the tenant mapping cache.
+ * Called when we detect a corrupt/stale entry (same GUID stored under multiple domains).
+ */
+export async function removeTenantMappingEntry(domain: string): Promise<void> {
+  if (!domain) return;
+  const mapping = await getTenantMapping();
+  if (domain in mapping) {
+    delete mapping[domain];
+    await saveTenantMapping(mapping);
+  }
+}
+
+/**
  * Update the shared domain → GUID mapping in storage.
  * Exported so history store can use the same cache without duplicating storage logic.
  */
@@ -103,6 +116,30 @@ async function learnTenantMapping(tenantGuid: string, tenantDomain: string): Pro
       await writeBookmarks(bookmarks);
     }
   }
+}
+
+/**
+ * Check if a GUID can safely be used for a given domain:
+ * - GUID not in cache → true (unknown, safe to use)
+ * - GUID maps to exactly this domain and no other → true (correct)
+ * - GUID maps to multiple domains OR to a different domain → false (corrupt/stale)
+ *
+ * Multi-domain detection catches cache corruption from old code that assigned
+ * the home-tenant GUID to guest-tenant domains (same GUID ends up under several keys).
+ */
+export async function isGuidValidForDomain(guid: string, domain: string): Promise<boolean> {
+  const mapping = await getTenantMapping();
+  const lowerDomain = domain.toLowerCase();
+  let count = 0;
+  let sole: string | null = null;
+  for (const [d, g] of Object.entries(mapping)) {
+    if (g === guid) {
+      count++;
+      if (count === 1) sole = d.toLowerCase();
+      else return false; // mapped to 2+ domains — ambiguous/corrupt
+    }
+  }
+  return count === 0 || sole === lowerDomain;
 }
 
 /**
@@ -164,9 +201,16 @@ export async function navigateToItem(url: string, tenantId: string | null, tenan
   const domain = tenantName?.toLowerCase() || null;
   const sameDirectory = isSameDirectory(currentDir.domain, domain);
 
-  let tenantGuid = tenantId;
-  if (!tenantGuid && domain) {
-    tenantGuid = await lookupTenantGuid(domain);
+  // Validate the stored tenantId — old bookmarks may have a corrupt GUID (same GUID
+  // stored for multiple domains by previous buggy code). If invalid, don't inject it.
+  let tenantGuid: string | null = null;
+  if (tenantId && domain && await isGuidValidForDomain(tenantId, domain)) {
+    tenantGuid = tenantId;
+  } else if (!tenantGuid && domain) {
+    const cachedGuid = await lookupTenantGuid(domain);
+    if (cachedGuid && await isGuidValidForDomain(cachedGuid, domain)) {
+      tenantGuid = cachedGuid;
+    }
   }
 
   let navigationUrl = url;
@@ -288,38 +332,32 @@ export const bookmarkStore = {
       const sameDir = isSameDirectory(currentDir.domain, itemDomain);
 
       // 2. Page context — window.Portal.tenant.id — only for same-directory items.
-      //    After directory switches this returns the OLD directory's GUID, so we detect
-      //    staleness: if the GUID is already cached for a DIFFERENT domain, it's stale.
+      //    Reject if the GUID maps to a different domain OR multiple domains (corrupt cache).
       if (sameDir) {
         const pageGuid = getTenantGuidFromPortal();
-        if (pageGuid) {
-          const knownDomain = await lookupDomainForGuid(pageGuid);
-          if (!knownDomain || knownDomain.toLowerCase() === itemDomain) {
-            // GUID is either unknown (fresh) or belongs to this domain — safe to use
-            effectiveTenantId = pageGuid;
-          }
-          // else: GUID belongs to a different domain — page context is stale, skip
+        if (pageGuid && await isGuidValidForDomain(pageGuid, itemDomain)) {
+          effectiveTenantId = pageGuid;
         }
       }
 
-      // 3. MSAL token scan — domain-aware, works for any directory with cached tokens.
-      //    Apply same staleness check as step 2: guest tokens have tid = HOME GUID but
-      //    upn ending in @guest-tenant, causing false-positive domain matches.
+      // 3. MSAL token scan — domain-aware. Same validity check: guest tokens have
+      //    tid = HOME GUID but upn ending in @guest-tenant (false-positive domain match).
       if (!effectiveTenantId) {
         const msalGuid = getGuidForDomain(itemDomain);
-        if (msalGuid) {
-          const knownDomainForMsal = await lookupDomainForGuid(msalGuid);
-          if (!knownDomainForMsal || knownDomainForMsal.toLowerCase() === itemDomain) {
-            effectiveTenantId = msalGuid;
-          }
+        if (msalGuid && await isGuidValidForDomain(msalGuid, itemDomain)) {
+          effectiveTenantId = msalGuid;
         }
       }
 
-      // 4. Tenant mapping cache — previously learned domain→GUID
+      // 4. Tenant mapping cache — previously learned domain→GUID.
+      //    Same validity check: corrupt cache may have the same GUID under multiple domains.
+      //    If invalid, remove the bad entry so navigateToItem won't use it either.
       if (!effectiveTenantId) {
         const cachedGuid = await lookupTenantGuid(itemDomain);
-        if (cachedGuid) {
+        if (cachedGuid && await isGuidValidForDomain(cachedGuid, itemDomain)) {
           effectiveTenantId = cachedGuid;
+        } else if (cachedGuid) {
+          await removeTenantMappingEntry(itemDomain);
         }
       }
     }

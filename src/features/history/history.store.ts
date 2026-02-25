@@ -2,7 +2,7 @@
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
 import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getGuidForDomain, getCurrentDirectoryInfo, isSameDirectory, getTenantGuidFromPortal } from '../bookmarks/url-parser';
-import { updateTenantMapping, lookupTenantGuid, lookupDomainForGuid } from '../bookmarks/bookmarks.store';
+import { updateTenantMapping, lookupTenantGuid, lookupDomainForGuid, isGuidValidForDomain, removeTenantMappingEntry } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
 
@@ -110,36 +110,32 @@ export const historyStore = {
         const sameDir = isSameDirectory(currentDir.domain, itemDomain);
 
         // 2. Page context — window.Portal.tenant.id — only for same-directory items.
-        //    After directory switches this returns the OLD directory's GUID, so we detect
-        //    staleness: if the GUID is already cached for a DIFFERENT domain, it's stale.
+        //    Reject if the GUID maps to a different domain OR multiple domains (corrupt cache).
         if (sameDir) {
           const pageGuid = getTenantGuidFromPortal();
-          if (pageGuid) {
-            const knownDomain = await lookupDomainForGuid(pageGuid);
-            if (!knownDomain || knownDomain.toLowerCase() === itemDomain) {
-              effectiveTenantId = pageGuid;
-            }
+          if (pageGuid && await isGuidValidForDomain(pageGuid, itemDomain)) {
+            effectiveTenantId = pageGuid;
           }
         }
 
-        // 3. MSAL token scan — domain-aware, works for any directory with cached tokens.
-        //    Apply same staleness check as step 2: guest tokens have tid = HOME GUID but
-        //    upn ending in @guest-tenant, causing false-positive domain matches.
+        // 3. MSAL token scan — domain-aware. Same validity check: guest tokens have
+        //    tid = HOME GUID but upn ending in @guest-tenant (false-positive domain match).
         if (!effectiveTenantId) {
           const msalGuid = getGuidForDomain(itemDomain);
-          if (msalGuid) {
-            const knownDomainForMsal = await lookupDomainForGuid(msalGuid);
-            if (!knownDomainForMsal || knownDomainForMsal.toLowerCase() === itemDomain) {
-              effectiveTenantId = msalGuid;
-            }
+          if (msalGuid && await isGuidValidForDomain(msalGuid, itemDomain)) {
+            effectiveTenantId = msalGuid;
           }
         }
 
-        // 4. Tenant mapping cache — previously learned domain→GUID
+        // 4. Tenant mapping cache — previously learned domain→GUID.
+        //    Same validity check: corrupt cache may have the same GUID under multiple domains.
+        //    If invalid, remove the bad entry so navigateToItem won't use it either.
         if (!effectiveTenantId) {
           const cachedGuid = await lookupTenantGuid(itemDomain);
-          if (cachedGuid) {
+          if (cachedGuid && await isGuidValidForDomain(cachedGuid, itemDomain)) {
             effectiveTenantId = cachedGuid;
+          } else if (cachedGuid) {
+            await removeTenantMappingEntry(itemDomain);
           }
         }
       }

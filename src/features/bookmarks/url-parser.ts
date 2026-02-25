@@ -422,9 +422,8 @@ function getTenantGuidFromPortalOnce(): string | null {
         const claims = JSON.parse(decoded);
         const tid = claims.tid;
         // Try to get domain from 'upn' (user principal name) or 'idp' claims.
-        // Skip guest UPNs (#EXT# format): tid is home tenant GUID, not the UPN domain's GUID.
         let domain: string | null = null;
-        if (claims.upn && claims.upn.includes('@') && !claims.upn.includes('#EXT#')) {
+        if (claims.upn && claims.upn.includes('@')) {
           domain = claims.upn.split('@')[1].toLowerCase();
         } else if (claims.idp) {
           domain = claims.idp.toLowerCase();
@@ -706,8 +705,7 @@ export function getGuidForDomain(domain: string): string | null {
         const claims = JSON.parse(decoded);
         const tid = claims.tid;
         let tokenDomain: string | null = null;
-        if (claims.upn && claims.upn.includes('@') && !claims.upn.includes('#EXT#')) {
-          // Skip guest UPNs (#EXT# format): tid is home tenant GUID, not the UPN domain's GUID
+        if (claims.upn && claims.upn.includes('@')) {
           tokenDomain = claims.upn.split('@')[1].toLowerCase();
         } else if (claims.idp) {
           tokenDomain = claims.idp.toLowerCase();

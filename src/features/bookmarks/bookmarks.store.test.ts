@@ -94,6 +94,22 @@ describe('bookmarkStore', () => {
       if (result.success) expect(result.bookmark.tenantId).toBe(pageGuid);
     });
 
+    it('should reject cached GUID from step 4 when the same GUID is mapped to multiple domains', async () => {
+      // Simulate cache corruption: old buggy code stored the same GUID for two different domains
+      const { updateTenantMapping } = await import('./bookmarks.store');
+      await updateTenantMapping('22222222-2222-2222-2222-222222222222', 'other-tenant.onmicrosoft.com');
+      await updateTenantMapping('22222222-2222-2222-2222-222222222222', 'contoso.onmicrosoft.com');
+
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      // Should NOT use the GUID — it maps to multiple domains (cache is corrupt)
+      if (result.success) expect(result.bookmark.tenantId).toBeNull();
+    });
+
     it('should reject MSAL GUID when it is already cached for a different domain', async () => {
       // Cache GUID as belonging to domain A
       const { updateTenantMapping } = await import('./bookmarks.store');

@@ -32,10 +32,12 @@ vi.mock('../bookmarks/url-parser', () => ({
   })),
   extractDisplayName: vi.fn(() => 'my-app'),
   extractResourceName: vi.fn(() => 'my-app'),
-  getTenantNameFromDOM: vi.fn(() => 'Test Tenant'),
+  getTenantNameFromDOM: vi.fn(() => 'test.onmicrosoft.com'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
+  getGuidForDomain: vi.fn(() => null),
   getTenantGuidFromPortal: vi.fn(() => null),
   getCurrentDirectoryInfo: vi.fn(() => ({ domain: 'test.onmicrosoft.com', guid: null })),
+  isSameDirectory: vi.fn((a: string | null, b: string | null) => a?.toLowerCase() === b?.toLowerCase()),
   isErrorPage: vi.fn(() => false), // Mock as not an error page by default
   buildNavigationUrl: vi.fn((url: string, tenantId: string) => {
     if (!tenantId || tenantId === 'unknown') return url;
@@ -57,7 +59,7 @@ vi.mock('../bookmarks/url-parser', () => ({
 
 import { historyStore } from './history.store';
 import { storageGet, storageSet } from '../../shared/storage';
-import { parsePortalUrl, getTenantGuidFromPortal, getCurrentDirectoryInfo } from '../bookmarks/url-parser';
+import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal } from '../bookmarks/url-parser';
 
 describe('historyStore', () => {
   beforeEach(() => {
@@ -439,73 +441,69 @@ describe('historyStore', () => {
     });
   });
 
-  describe('tenant GUID fallbacks at save time', () => {
-    it('should store null tenantId when URL has no GUID even if page context has a GUID', async () => {
-      // Page context (window.Portal.tenant.id) returns the *authenticated* tenant GUID.
-      // When the user browses a cross-tenant resource via #@domain/resource/... (no GUID in
-      // URL path), the page context still reflects the home tenant — storing it would poison
-      // the item with the wrong tenantId. Only trust the URL path GUID.
-      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
-      vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: null,
-        tenantDomain: 'contoso.onmicrosoft.com',
-        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
-        blade: null,
-        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
-      } as any);
+  describe('tenant GUID resolution at save time', () => {
+    it('should store GUID from page context for same-directory items', async () => {
+      const pageGuid = '88888888-8888-8888-8888-888888888888';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageGuid);
 
-      const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123');
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
 
-      expect(entry).not.toBeNull();
-      expect(entry!.tenantId).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBe(pageGuid);
     });
 
-    it('should store null tenantId when no URL GUID and no page context (cache not trusted)', async () => {
-      // Cache has an entry but it must NOT be used — it may be stale or corrupted.
-      mockStorage['tenantMapping'] = {
-        'contoso.onmicrosoft.com': '88888888-8888-8888-8888-888888888888',
-      };
+    it('should reject stale page context GUID when it belongs to a different domain in cache', async () => {
+      const { updateTenantMapping } = await import('../bookmarks/bookmarks.store');
+      await updateTenantMapping('88888888-8888-8888-8888-888888888888', 'other-tenant.onmicrosoft.com');
+
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce('88888888-8888-8888-8888-888888888888');
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBeNull();
+    });
+
+    it('should store GUID from MSAL when page context returns null', async () => {
+      const msalGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(msalGuid);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBe(msalGuid);
+    });
+
+    it('should store null tenantId when all sources return null', async () => {
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBeNull();
+    });
+
+    it('should store GUID from cache when page context and MSAL return null', async () => {
+      const { updateTenantMapping } = await import('../bookmarks/bookmarks.store');
+      await updateTenantMapping('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test.onmicrosoft.com');
 
       vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
-      vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: null,
-        tenantDomain: 'contoso.onmicrosoft.com',
-        resourceId: '/subscriptions/sub-456/resourceGroups/rg-test/providers/Microsoft.Web/sites/other-app',
-        blade: null,
-        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-456',
-      } as any);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
 
-      const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-456');
+      const result = await historyStore.upsert('https://portal.azure.com/#@test.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
 
-      expect(entry).not.toBeNull();
-      expect(entry!.tenantId).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBe('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
     });
 
-    it('should leave tenantId null when no source has a GUID', async () => {
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
-      vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: null,
-        tenantDomain: 'unknown-domain.onmicrosoft.com',
-        resourceId: '/subscriptions/sub-789/resourceGroups/rg-test/providers/Microsoft.Web/sites/app3',
-        blade: null,
-        fullUrl: 'https://portal.azure.com/#@unknown-domain.onmicrosoft.com/resource/subscriptions/sub-789',
-      } as any);
-
-      const entry = await historyStore.upsert('https://portal.azure.com/#@unknown-domain.onmicrosoft.com/resource/subscriptions/sub-789');
-
-      expect(entry).not.toBeNull();
-      expect(entry!.tenantId).toBeNull();
-    });
-
-    it('should always trust URL path GUID even when cache has a different GUID (self-healing)', async () => {
-      // Self-healing scenario: cache was corrupted with wrong GUID for this domain.
-      // When a valid URL path GUID is present, it overrides the cache and fixes the mapping.
-      const urlGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // correct GUID in URL path
-      const cachedWrongGuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // stale/corrupted cache
+    it('should always trust URL path GUID even when cache has a different GUID', async () => {
+      const urlGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
       mockStorage['tenantMapping'] = {
-        'contoso.onmicrosoft.com': cachedWrongGuid,
+        'contoso.onmicrosoft.com': 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       };
 
       vi.mocked(parsePortalUrl).mockReturnValueOnce({
@@ -521,74 +519,15 @@ describe('historyStore', () => {
       );
 
       expect(entry).not.toBeNull();
-      // URL path GUID wins — cache is updated (self-healed)
       expect(entry!.tenantId).toBe(urlGuid);
-      // Cache should now have the correct GUID
       expect(mockStorage['tenantMapping']['contoso.onmicrosoft.com']).toBe(urlGuid);
-    });
-  });
-
-  describe('tenant GUID resolution at save time', () => {
-    it('should store GUID from page context when item domain matches current directory', async () => {
-      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
-      // Ensure getCurrentDirectoryInfo returns matching domain
-      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
-        domain: 'contoso.onmicrosoft.com',
-        guid: null,
-      });
-      // getTenantNameFromDOM returns null so effectiveTenantName falls through to parsed.tenantDomain
-      const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
-      vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
-
-      vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: null,
-        tenantDomain: 'contoso.onmicrosoft.com',
-        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
-        blade: null,
-        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
-      } as any);
-
-      const result = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
-
-      expect(result).not.toBeNull();
-      expect(result!.tenantId).toBe(pageContextGuid);
-    });
-
-    it('should store null tenantId when domains do not match and cache has no mapping', async () => {
-      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
-      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
-        domain: 'fabrikam.onmicrosoft.com',
-        guid: null,
-      });
-      const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
-      vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
-
-      vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: null,
-        tenantDomain: 'contoso.onmicrosoft.com',
-        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
-        blade: null,
-        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
-      } as any);
-
-      const result = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
-
-      expect(result).not.toBeNull();
-      expect(result!.tenantId).toBeNull();
     });
 
     it('should store GUID from cache for cross-directory item', async () => {
-      // Populate cache
       const { updateTenantMapping } = await import('../bookmarks/bookmarks.store');
       await updateTenantMapping('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'contoso.onmicrosoft.com');
 
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
-      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
-        domain: 'fabrikam.onmicrosoft.com',
-        guid: null,
-      });
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
       const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
       vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
 

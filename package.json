@@ -1,6 +1,6 @@
 {
   "name": "betterportal",
-  "version": "1.0.92",
+  "version": "1.0.93",
   "description": "Bookmark Azure Portal resources for instant revisits. Keyboard-driven overlay with history, cross-tenant navigation, and search.",
   "type": "module",
   "license": "MIT",
