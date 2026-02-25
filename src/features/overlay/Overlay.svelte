@@ -28,7 +28,7 @@
 
   async function copyItemUrl(item: any, event: MouseEvent) {
     event.stopPropagation();
-    const url = buildCopyUrl(item, $currentDirectory);
+    const url = buildCopyUrl(item);
     await navigator.clipboard.writeText(url);
     copiedItemId = item.id;
     setTimeout(() => { copiedItemId = null; }, 1500);
@@ -490,7 +490,7 @@
                   <button
                     class="bp-copy-btn"
                     class:bp-copy-btn--copied={copiedItemId === item.id}
-                    title={copiedItemId === item.id ? 'Copied!' : (item.tenantId ? 'Copy URL' : 'Copy URL (GUID unavailable — may not switch directories)')}
+                    title={copiedItemId === item.id ? 'Copied!' : 'Copy URL'}
                     on:click={(e) => copyItemUrl(item, e)}
                   >
                     {#if copiedItemId === item.id}
