@@ -439,10 +439,13 @@ describe('historyStore', () => {
   });
 
   describe('tenant GUID fallbacks at save time', () => {
-    it('should use getTenantGuidFromPortal when URL has no GUID', async () => {
-      // parsePortalUrl returns non-GUID tenantId, so fallback kicks in
-      const mockGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(mockGuid);
+    it('should store null tenantId when URL has no GUID even if page context has a GUID', async () => {
+      // Page context (window.Portal.tenant.id) returns the *authenticated* tenant GUID.
+      // When the user browses a cross-tenant resource via #@domain/resource/... (no GUID in
+      // URL path), the page context still reflects the home tenant — storing it would poison
+      // the item with the wrong tenantId. Only trust the URL path GUID.
+      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
       vi.mocked(parsePortalUrl).mockReturnValueOnce({
         tenantId: null,
         tenantDomain: 'contoso.onmicrosoft.com',
@@ -454,7 +457,7 @@ describe('historyStore', () => {
       const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123');
 
       expect(entry).not.toBeNull();
-      expect(entry!.tenantId).toBe(mockGuid);
+      expect(entry!.tenantId).toBeNull();
     });
 
     it('should store null tenantId when no URL GUID and no page context (cache not trusted)', async () => {

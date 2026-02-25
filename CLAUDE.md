@@ -51,11 +51,14 @@ The extension supports multiple Azure AD tenants/directories. Two separate conce
    - If URL has GUID in path, cache the domain→GUID mapping for future lookups
    - If URL has no GUID in path, set tenantId to null (don't try cache/MSAL - they're unreliable)
 
-**Why not trust cache or MSAL tokens?**
-- MSAL caches tokens for ALL tenants user has authenticated to
+**Why not trust `getTenantGuidFromPortal()` / page context / MSAL tokens?**
+- `window.Portal.tenant.id` returns the *authenticated* tenant GUID, not the browsed tenant
+- When user accesses `#@other-tenant/resource/...` without a GUID in the URL path, the portal's JS context still reflects the home tenant — storing it would give every item the same wrong GUID
+- MSAL caches tokens for ALL tenants user has authenticated to; domain matching in MSAL fallback is unreliable
 - After switching directories, MSAL may return a GUID from a different tenant
 - Cached mappings can become stale if the same domain maps to different GUIDs in different contexts
 - Using wrong GUID causes ERR_INVALID_RESPONSE errors
+- **Fix**: `bookmarks.store.ts` and `history.store.ts` no longer call `getTenantGuidFromPortal()`. When URL has no GUID in path, `effectiveTenantId` is always `null`. The `learnTenantMapping` backfill self-heals nulls when a proper `portal.azure.com/{GUID}/...` URL is later visited.
 
 ### URL Format (Critical for Cross-Tenant Navigation)
 **Correct format for cross-tenant navigation:**
@@ -116,5 +119,5 @@ https://portal.azure.com/12345678-1234-1234-1234-123456789abc/#@contoso.onmicros
 | Clicks pass through overlay | Missing `pointer-events: auto` on interactive elements | Add to modal/panel CSS |
 | Subscription shows GUID | DOM name not being used | Detect GUID pattern, prefer DOM name |
 | Tenant switch works once then fails | Cached tenant GUID from first extraction | Never cache extracted GUID - always re-extract (user may switch tenants) |
-| tenantId stored as domain, not GUID | `getTenantGuidFromPortal()` returned null | Check console logs; may need to inject script into page context for window objects |
+| All items get the same tenantId (wrong GUID) | `getTenantGuidFromPortal()` called as fallback — returns authenticated-tenant GUID even when browsing different tenant | Do NOT call `getTenantGuidFromPortal()` when storing; store null if no GUID in URL path |
 

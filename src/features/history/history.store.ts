@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage } from '../bookmarks/url-parser';
 import { updateTenantMapping, lookupTenantGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
@@ -93,9 +93,14 @@ export const historyStore = {
       // tenantId: Used for cross-tenant navigation - MUST be a GUID, null if unavailable
       // tenantName: Used for grouping/display - should be the domain for consistent grouping
       //
-      // Strategy: always trust URL path GUID when present (self-heals corrupted caches).
-      // Transitional states (A-guid/#@b-domain) are handled by isErrorPage() below.
-      // Do NOT fall back to cache lookup — a stale entry would store the wrong GUID.
+      // Strategy: ONLY trust the URL path GUID.
+      // - URL has GUID in path → use it (also cache the domain→GUID mapping for backfill).
+      // - URL has no GUID in path → store null. Do NOT fall back to getTenantGuidFromPortal():
+      //   page context (window.Portal.tenant.id) returns the *authenticated* tenant GUID, but
+      //   when a user browses a cross-tenant resource via #@domain/resource/... the portal's JS
+      //   context still reflects the home tenant, so getTenantGuidFromPortal() returns a stale
+      //   GUID that poisons every item with the same wrong value.
+      //   The backfill in learnTenantMapping self-heals nulls when a GUID URL is later visited.
 
       const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
 
@@ -103,22 +108,14 @@ export const historyStore = {
       let effectiveTenantId: string | null = null;
 
       if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
-        // URL path GUID is the most reliable source — always trust it and cache the mapping.
+        // URL path GUID is the only reliable source — always trust it and cache the mapping.
         effectiveTenantId = parsed.tenantId;
         if (parsed.tenantDomain) {
           await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
         }
-      } else {
-        // URL does not have GUID in path — try live page context only.
-        effectiveTenantId = getTenantGuidFromPortal();
-        if (effectiveTenantId) {
-          const domain = parsed.tenantDomain || effectiveTenantName;
-          if (domain && domain !== 'Unknown Tenant') {
-            await learnTenantMapping(effectiveTenantId, domain);
-          }
-        }
-        // No cache fallback — a stale/corrupted cache entry would store the wrong GUID.
       }
+      // else: no GUID in URL path → effectiveTenantId stays null.
+      // Do NOT call getTenantGuidFromPortal() — see strategy comment above.
 
       // Strip any tenant GUID from the stored URL — the url field should be the canonical
       // resource URL. The GUID is stored separately in tenantId and injected at navigation/copy time.

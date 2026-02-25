@@ -16,7 +16,7 @@
   } from './overlay.store';
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
-  import { buildNavigationUrl } from '../bookmarks/url-parser';
+  import { buildCopyUrl } from '../bookmarks/url-parser';
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
@@ -28,16 +28,7 @@
 
   async function copyItemUrl(item: any, event: MouseEvent) {
     event.stopPropagation();
-
-    // Use the stored tenantId directly — it's the GUID recorded when the item was saved.
-    // Guard against historic items where the GUID was incorrectly recorded as the current
-    // directory's GUID (e.g. extension loaded in dir A, saw portal.azure.com/A-guid/#@b-domain/).
-    // In that case, discard the suspect GUID rather than injecting the wrong one.
-    const isSameDir = item.tenantName?.toLowerCase() === $currentDirectory.domain?.toLowerCase();
-    const guidIsSuspect = !isSameDir && !!item.tenantId && item.tenantId === $currentDirectory.guid;
-    const tenantGuid = guidIsSuspect ? null : item.tenantId;
-
-    const url = tenantGuid ? buildNavigationUrl(item.url, tenantGuid) : item.url;
+    const url = buildCopyUrl(item, $currentDirectory);
     await navigator.clipboard.writeText(url);
     copiedItemId = item.id;
     setTimeout(() => { copiedItemId = null; }, 1500);
