@@ -539,78 +539,17 @@ describe('url-parser', () => {
 
   describe('buildCopyUrl', () => {
     const CONTOSO_URL = 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.Web/sites/my-app';
-    const CURRENT_DIR_GUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
-    const CROSS_DIR_GUID   = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const ITEM_GUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
-    it('injects correct GUID for cross-directory item from a different directory', () => {
-      // Item belongs to fabrikam, its GUID is different from the current contoso directory.
-      const item = {
-        url: CONTOSO_URL,
-        tenantId: CROSS_DIR_GUID,
-        tenantName: 'fabrikam.onmicrosoft.com',
-      };
-      const currentDir = { domain: 'contoso.onmicrosoft.com', guid: CURRENT_DIR_GUID };
-
-      const result = buildCopyUrl(item, currentDir);
-
-      expect(result).toContain(`portal.azure.com/${CROSS_DIR_GUID}/`);
+    it('injects stored GUID into URL', () => {
+      const item = { url: CONTOSO_URL, tenantId: ITEM_GUID };
+      const result = buildCopyUrl(item);
+      expect(result).toContain(`portal.azure.com/${ITEM_GUID}/`);
     });
 
-    it('returns base URL (no GUID injected) when cross-directory item has null tenantId', () => {
-      // Item from fabrikam but tenantId never recorded (URL had no GUID at save time).
-      const item = {
-        url: CONTOSO_URL,
-        tenantId: null,
-        tenantName: 'fabrikam.onmicrosoft.com',
-      };
-      const currentDir = { domain: 'contoso.onmicrosoft.com', guid: CURRENT_DIR_GUID };
-
-      const result = buildCopyUrl(item, currentDir);
-
-      expect(result).toBe(CONTOSO_URL);
-    });
-
-    it('discards suspect GUID and returns base URL when cross-dir item carries the current dir GUID', () => {
-      // Suspect scenario: item is from fabrikam but somehow has the contoso GUID stored
-      // (artifact of the historic bug where getTenantGuidFromPortal() returned the home
-      // tenant GUID for all items saved without a URL-path GUID).
-      // Injecting this GUID would navigate to contoso, not fabrikam.
-      const item = {
-        url: CONTOSO_URL,
-        tenantId: CURRENT_DIR_GUID,     // matches current dir — flag as suspect
-        tenantName: 'fabrikam.onmicrosoft.com',
-      };
-      const currentDir = { domain: 'contoso.onmicrosoft.com', guid: CURRENT_DIR_GUID };
-
-      const result = buildCopyUrl(item, currentDir);
-
-      expect(result).toBe(CONTOSO_URL);
-      expect(result).not.toContain(CURRENT_DIR_GUID);
-    });
-
-    it('injects GUID for same-directory item that has a tenantId', () => {
-      const item = {
-        url: CONTOSO_URL,
-        tenantId: CURRENT_DIR_GUID,
-        tenantName: 'contoso.onmicrosoft.com',
-      };
-      const currentDir = { domain: 'contoso.onmicrosoft.com', guid: CURRENT_DIR_GUID };
-
-      const result = buildCopyUrl(item, currentDir);
-
-      expect(result).toContain(`portal.azure.com/${CURRENT_DIR_GUID}/`);
-    });
-
-    it('returns base URL for same-directory item with null tenantId', () => {
-      const item = {
-        url: CONTOSO_URL,
-        tenantId: null,
-        tenantName: 'contoso.onmicrosoft.com',
-      };
-      const currentDir = { domain: 'contoso.onmicrosoft.com', guid: CURRENT_DIR_GUID };
-
-      const result = buildCopyUrl(item, currentDir);
-
+    it('returns raw URL when tenantId is null', () => {
+      const item = { url: CONTOSO_URL, tenantId: null };
+      const result = buildCopyUrl(item);
       expect(result).toBe(CONTOSO_URL);
     });
   });

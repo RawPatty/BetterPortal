@@ -647,25 +647,16 @@ export function getTenantGuidFromPortal(): string | null {
 }
 
 /**
- * Build a URL for copying to clipboard, handling cross-directory navigation.
+ * Build a URL for copying to clipboard.
+ * Uses the item's stored tenantId (resolved at save time) to inject the
+ * directory GUID into the URL path for cross-directory navigation.
  *
- * Injects the item's tenantId GUID into the URL path when appropriate. Detects and
- * discards "suspect" GUIDs — stored tenantIds that equal the *current* directory's GUID
- * on an item that belongs to a different directory. This was a symptom of the historic
- * bug where getTenantGuidFromPortal() returned the authenticated-tenant GUID for every
- * saved item, regardless of which tenant's resource was being browsed.
- *
- * @param item - The bookmark or history entry to build a URL for
- * @param currentDirectory - The currently active Azure Portal directory
+ * @param item - The bookmark or history entry with a pre-resolved tenantId
  */
 export function buildCopyUrl(
-  item: { url: string; tenantId: string | null; tenantName: string | null },
-  currentDirectory: { domain: string | null; guid: string | null }
+  item: { url: string; tenantId: string | null }
 ): string {
-  const isSameDir = item.tenantName?.toLowerCase() === currentDirectory.domain?.toLowerCase();
-  const guidIsSuspect = !isSameDir && !!item.tenantId && item.tenantId === currentDirectory.guid;
-  const tenantGuid = guidIsSuspect ? null : item.tenantId;
-  return tenantGuid ? buildNavigationUrl(item.url, tenantGuid) : item.url;
+  return item.tenantId ? buildNavigationUrl(item.url, item.tenantId) : item.url;
 }
 
 /**
