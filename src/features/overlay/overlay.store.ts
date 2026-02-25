@@ -1,10 +1,10 @@
 // Overlay state management
 import { writable, derived, get } from 'svelte/store';
 import type { Bookmark, HistoryEntry, OverlayMode, Settings } from '../../shared/types';
-import { bookmarkStore, navigateToItem } from '../bookmarks/bookmarks.store';
+import { bookmarkStore, navigateToItem, updateTenantMapping } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { historyStore } from '../history/history.store';
-import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
+import { getCurrentDirectoryInfo, getTenantGuidFromPortal } from '../bookmarks/url-parser';
 import { storageSyncGet, storageSyncSet } from '../../shared/storage';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -199,7 +199,17 @@ export const overlayActions = {
    * Refresh data from storage
    */
   async refresh() {
-    currentDirectory.set(getCurrentDirectoryInfo());
+    const dirInfo = getCurrentDirectoryInfo();
+    currentDirectory.set(dirInfo);
+
+    // Passively cache current directory's domain → GUID mapping.
+    // getTenantGuidFromPortal() reads window.Portal.tenant.id which reliably
+    // returns the authenticated directory's GUID. By caching on every overlay
+    // open, we build up the mapping over time for use at save time.
+    const portalGuid = getTenantGuidFromPortal();
+    if (dirInfo.domain && portalGuid) {
+      updateTenantMapping(portalGuid, dirInfo.domain);
+    }
     try {
       const [bookmarkData, settingsData, tenantAliasData] = await Promise.all([
         bookmarkStore.getAll(),
