@@ -457,8 +457,8 @@ describe('historyStore', () => {
       expect(entry!.tenantId).toBe(mockGuid);
     });
 
-    it('should use cached mapping when no URL GUID and no page context', async () => {
-      // Pre-populate the tenant mapping cache
+    it('should store null tenantId when no URL GUID and no page context (cache not trusted)', async () => {
+      // Cache has an entry but it must NOT be used — it may be stale or corrupted.
       mockStorage['tenantMapping'] = {
         'contoso.onmicrosoft.com': '88888888-8888-8888-8888-888888888888',
       };
@@ -475,7 +475,7 @@ describe('historyStore', () => {
       const entry = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-456');
 
       expect(entry).not.toBeNull();
-      expect(entry!.tenantId).toBe('88888888-8888-8888-8888-888888888888');
+      expect(entry!.tenantId).toBeNull();
     });
 
     it('should leave tenantId null when no source has a GUID', async () => {
@@ -494,32 +494,33 @@ describe('historyStore', () => {
       expect(entry!.tenantId).toBeNull();
     });
 
-    it('should use cached GUID when URL path GUID conflicts with hash domain (transitional state)', async () => {
-      // Bug scenario: portal.azure.com/A-guid/#@b-domain — URL path GUID is from source tenant,
-      // hash domain is the target tenant. Cache knows the correct GUID for b-domain.
-      const sourceGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // source tenant A (wrong for this resource)
-      const targetGuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // target tenant B (correct)
+    it('should always trust URL path GUID even when cache has a different GUID (self-healing)', async () => {
+      // Self-healing scenario: cache was corrupted with wrong GUID for this domain.
+      // When a valid URL path GUID is present, it overrides the cache and fixes the mapping.
+      const urlGuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // correct GUID in URL path
+      const cachedWrongGuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // stale/corrupted cache
 
       mockStorage['tenantMapping'] = {
-        'contoso.onmicrosoft.com': targetGuid,
+        'contoso.onmicrosoft.com': cachedWrongGuid,
       };
 
       vi.mocked(parsePortalUrl).mockReturnValueOnce({
-        tenantId: sourceGuid,
+        tenantId: urlGuid,
         tenantDomain: 'contoso.onmicrosoft.com',
         resourceId: '/subscriptions/sub-900/resourceGroups/rg-test/providers/Microsoft.Web/sites/transitional-app',
         blade: null,
-        fullUrl: `https://portal.azure.com/${sourceGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-900`,
+        fullUrl: `https://portal.azure.com/${urlGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-900`,
       } as any);
 
       const entry = await historyStore.upsert(
-        `https://portal.azure.com/${sourceGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-900`
+        `https://portal.azure.com/${urlGuid}/#@contoso.onmicrosoft.com/resource/subscriptions/sub-900`
       );
 
       expect(entry).not.toBeNull();
-      // Should use cached GUID for the hash domain, not the mismatched URL path GUID
-      expect(entry!.tenantId).toBe(targetGuid);
-      expect(entry!.tenantId).not.toBe(sourceGuid);
+      // URL path GUID wins — cache is updated (self-healed)
+      expect(entry!.tenantId).toBe(urlGuid);
+      // Cache should now have the correct GUID
+      expect(mockStorage['tenantMapping']['contoso.onmicrosoft.com']).toBe(urlGuid);
     });
   });
 

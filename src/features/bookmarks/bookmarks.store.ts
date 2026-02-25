@@ -258,13 +258,12 @@ export const bookmarkStore = {
     // tenantName: Used for grouping/display - should be the domain for consistent grouping
     //
     // Strategy for finding tenant GUID (in order of reliability):
-    // 1. URL path GUID (parsed.tenantId) — reliable ONLY when consistent with hash domain.
-    //    If cache already maps hash domain to a DIFFERENT GUID, the URL is in a transitional
-    //    directory-switch state (e.g., portal.azure.com/A-guid/#@b-domain/ mid-transition);
-    //    in that case use the cached GUID for this domain instead.
-    // 2. Cached domain→GUID mapping (used when URL path GUID conflicts, or no GUID in path)
-    // 3. getTenantGuidFromPortal() - may return wrong tenant from MSAL cache, but better than nothing
-    // 4. null - if no GUID found, don't store domain as tenantId
+    // 1. URL path GUID (parsed.tenantId) — always trust this when present. Trusting the URL
+    //    path allows self-healing of any corrupted cache entries over time. Transitional
+    //    directory-switch URLs (A-guid/#@b-domain) are rare and short-lived.
+    // 2. getTenantGuidFromPortal() — live page context, reliable for the current save
+    // 3. null — do NOT fall back to cache lookup; a stale/corrupted cache entry would
+    //    silently poison newly saved items with the wrong GUID
 
     const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
 
@@ -272,45 +271,21 @@ export const bookmarkStore = {
     let effectiveTenantId: string | null = null;
 
     if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
+      // URL path GUID is the most reliable source — always trust it and cache the mapping.
+      effectiveTenantId = parsed.tenantId;
       if (parsed.tenantDomain) {
-        // Both GUID in path and domain in hash: verify they're consistent.
-        // A mismatch means the URL is in a transitional directory-switch state —
-        // the path GUID belongs to the source tenant, not the target domain.
-        const cachedGuid = await lookupTenantGuid(parsed.tenantDomain);
-        if (!cachedGuid || cachedGuid === parsed.tenantId) {
-          // Consistent (or first time seeing this domain): trust URL path GUID and cache it.
-          effectiveTenantId = parsed.tenantId;
-          await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
-        } else {
-          // Conflict: URL path GUID is from a different tenant than the hash domain.
-          // Use the cached GUID (learned from a stable URL previously).
-          effectiveTenantId = cachedGuid;
-        }
-      } else {
-        // Only GUID in path, no domain in hash — trust it.
-        effectiveTenantId = parsed.tenantId;
+        await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
       }
     } else {
-      // URL does not have GUID in path - try fallbacks
-
-      // Fallback 1: Try page context / MSAL — reliable for current page's tenant at save time
-      if (!effectiveTenantId) {
-        effectiveTenantId = getTenantGuidFromPortal();
-        if (effectiveTenantId) {
-          const domain = parsed.tenantDomain || effectiveTenantName;
-          if (domain && domain !== 'Unknown Tenant') {
-            await learnTenantMapping(effectiveTenantId, domain);
-          }
-        }
-      }
-
-      // Fallback 2: Try cached domain→GUID mapping
-      if (!effectiveTenantId) {
+      // URL does not have GUID in path — try live page context only.
+      effectiveTenantId = getTenantGuidFromPortal();
+      if (effectiveTenantId) {
         const domain = parsed.tenantDomain || effectiveTenantName;
         if (domain && domain !== 'Unknown Tenant') {
-          effectiveTenantId = await lookupTenantGuid(domain);
+          await learnTenantMapping(effectiveTenantId, domain);
         }
       }
+      // No cache fallback — a stale/corrupted cache entry would store the wrong GUID.
     }
 
     // Strip any tenant GUID from the stored URL — the url field should be the canonical
