@@ -94,6 +94,22 @@
     const guid = extractGuid();
     if (guid) {
       document.documentElement.setAttribute(ATTR_NAME, guid);
+      // Seed current tenant if not yet set by fetch interception.
+      // Covers sessions with valid cached tokens where no MSAL fetch is needed.
+      // Never overwrites a fetch-intercepted value (authoritative after directory switches).
+      if (!document.documentElement.hasAttribute(CURRENT_TENANT_ATTR)) {
+        document.documentElement.setAttribute(CURRENT_TENANT_ATTR, guid);
+      }
     }
   });
+
+  // Seed immediately on load — handles existing sessions where portal JS (window.Portal)
+  // is already initialised by document_idle and no new MSAL token fetch will occur.
+  // The fetch interceptor above will overwrite this on any subsequent token request.
+  const seedGuid = extractGuid();
+  if (seedGuid) {
+    if (!document.documentElement.hasAttribute(CURRENT_TENANT_ATTR)) {
+      document.documentElement.setAttribute(CURRENT_TENANT_ATTR, seedGuid);
+    }
+  }
 })();
