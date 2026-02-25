@@ -45,6 +45,7 @@ vi.mock('./url-parser', () => ({
   extractResourceName: vi.fn(() => 'my-app'),
   getTenantNameFromDOM: vi.fn(() => 'contoso.onmicrosoft.com'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
+  getGuidForDomain: vi.fn(() => null),
   getTenantGuidFromPortal: vi.fn(() => null),
   stripBlade: vi.fn((url: string) => url),
   buildNavigationUrl: vi.fn((url: string, tenantId: string) => {
@@ -70,7 +71,7 @@ const mockLocation = { href: 'https://portal.azure.com/#@contoso.onmicrosoft.com
 vi.stubGlobal('window', { location: mockLocation });
 
 import { bookmarkStore, migrateBookmarks, migrateBookmarksToSync, migrateBookmarksFromSync } from './bookmarks.store';
-import { parsePortalUrl, getTenantGuidFromPortal } from './url-parser';
+import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal } from './url-parser';
 import type { BookmarkSaveResult } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
 import { settingsStore } from '../settings/settings.store';
@@ -83,27 +84,63 @@ describe('bookmarkStore', () => {
   });
 
   describe('tenant GUID resolution at save time', () => {
-    it('should store GUID from page context when item domain matches current directory', async () => {
-      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
-      // Default mocks: parsePortalUrl returns tenantDomain 'contoso.onmicrosoft.com'
-      // getCurrentDirectoryInfo returns domain 'contoso.onmicrosoft.com' — domains match
+    it('should store GUID from page context for same-directory items', async () => {
+      const pageGuid = '88888888-8888-8888-8888-888888888888';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageGuid);
 
       const result = await bookmarkStore.saveCurrentPage();
 
       expect(result.success).toBe(true);
-      if (result.success) expect(result.bookmark.tenantId).toBe(pageContextGuid);
+      if (result.success) expect(result.bookmark.tenantId).toBe(pageGuid);
     });
 
-    it('should store null tenantId when domains do not match and cache has no mapping', async () => {
-      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
-      // Make current directory different from item domain
-      const { getCurrentDirectoryInfo } = await import('./url-parser');
-      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
-        domain: 'fabrikam.onmicrosoft.com',
-        guid: null,
-      });
+    it('should reject MSAL GUID when it is already cached for a different domain', async () => {
+      // Cache GUID as belonging to domain A
+      const { updateTenantMapping } = await import('./bookmarks.store');
+      await updateTenantMapping('11111111-1111-1111-1111-111111111111', 'other-tenant.onmicrosoft.com');
+
+      // Page context returns null
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      // MSAL returns the same GUID that belongs to a different domain (guest token false-positive)
+      vi.mocked(getGuidForDomain).mockReturnValueOnce('11111111-1111-1111-1111-111111111111');
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      // Should NOT use this GUID — it's cached for a different domain than 'contoso.onmicrosoft.com'
+      if (result.success) expect(result.bookmark.tenantId).toBeNull();
+    });
+
+    it('should reject stale page context GUID when it belongs to a different domain in cache', async () => {
+      // Cache says this GUID belongs to a different domain
+      const { updateTenantMapping } = await import('./bookmarks.store');
+      await updateTenantMapping('88888888-8888-8888-8888-888888888888', 'other-tenant.onmicrosoft.com');
+
+      // Page context returns this GUID (stale — from the old directory)
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce('88888888-8888-8888-8888-888888888888');
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      // Should NOT use the stale GUID — falls through to null
+      if (result.success) expect(result.bookmark.tenantId).toBeNull();
+    });
+
+    it('should store GUID from MSAL when page context returns null', async () => {
+      const msalGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(msalGuid);
+
+      const result = await bookmarkStore.saveCurrentPage();
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.bookmark.tenantId).toBe(msalGuid);
+    });
+
+    it('should store null tenantId when all sources return null', async () => {
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
 
       const result = await bookmarkStore.saveCurrentPage();
 
@@ -111,18 +148,12 @@ describe('bookmarkStore', () => {
       if (result.success) expect(result.bookmark.tenantId).toBeNull();
     });
 
-    it('should store GUID from cache for cross-directory item', async () => {
-      // Populate the tenant mapping cache for contoso
+    it('should store GUID from cache when page context and MSAL return null', async () => {
       const { updateTenantMapping } = await import('./bookmarks.store');
       await updateTenantMapping('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'contoso.onmicrosoft.com');
 
-      // Current directory is fabrikam (different from item's contoso)
-      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
-      const { getCurrentDirectoryInfo } = await import('./url-parser');
-      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
-        domain: 'fabrikam.onmicrosoft.com',
-        guid: null,
-      });
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(null);
+      vi.mocked(getGuidForDomain).mockReturnValueOnce(null);
 
       const result = await bookmarkStore.saveCurrentPage();
 

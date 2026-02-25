@@ -13,6 +13,7 @@ import {
   buildNavigationUrl,
   getCurrentDirectoryInfo,
   isSameDirectory,
+  getGuidForDomain,
   getTenantGuidFromPortal,
 } from './url-parser';
 import { settingsStore } from '../settings/settings.store';
@@ -51,6 +52,19 @@ async function writeBookmarks(bookmarks: Bookmark[]): Promise<void> {
   } else {
     await storageSet('bookmarks', bookmarks);
   }
+}
+
+/**
+ * Reverse lookup: find which domain a GUID is cached for.
+ * Used to detect stale page context GUIDs (if the GUID belongs to a different domain, it's stale).
+ */
+export async function lookupDomainForGuid(guid: string): Promise<string | null> {
+  if (!guid) return null;
+  const mapping = await getTenantMapping();
+  for (const [domain, cachedGuid] of Object.entries(mapping)) {
+    if (cachedGuid === guid) return domain;
+  }
+  return null;
 }
 
 /**
@@ -269,19 +283,40 @@ export const bookmarkStore = {
       // 1. URL path GUID — always trust it
       effectiveTenantId = parsed.tenantId;
     } else {
-      // No GUID in URL path — try page context and cache
-      const currentDir = getCurrentDirectoryInfo();
       const itemDomain = effectiveTenantName.toLowerCase();
-      const currentDomain = currentDir.domain?.toLowerCase() ?? null;
+      const currentDir = getCurrentDirectoryInfo();
+      const sameDir = isSameDirectory(currentDir.domain, itemDomain);
 
-      if (currentDomain && itemDomain === currentDomain) {
-        // 2. Same directory — page context GUID is reliable
-        const portalGuid = getTenantGuidFromPortal();
-        if (portalGuid && GUID_REGEX.test(portalGuid)) {
-          effectiveTenantId = portalGuid;
+      // 2. Page context — window.Portal.tenant.id — only for same-directory items.
+      //    After directory switches this returns the OLD directory's GUID, so we detect
+      //    staleness: if the GUID is already cached for a DIFFERENT domain, it's stale.
+      if (sameDir) {
+        const pageGuid = getTenantGuidFromPortal();
+        if (pageGuid) {
+          const knownDomain = await lookupDomainForGuid(pageGuid);
+          if (!knownDomain || knownDomain.toLowerCase() === itemDomain) {
+            // GUID is either unknown (fresh) or belongs to this domain — safe to use
+            effectiveTenantId = pageGuid;
+          }
+          // else: GUID belongs to a different domain — page context is stale, skip
         }
-      } else {
-        // 3. Cross-directory — look up from cache
+      }
+
+      // 3. MSAL token scan — domain-aware, works for any directory with cached tokens.
+      //    Apply same staleness check as step 2: guest tokens have tid = HOME GUID but
+      //    upn ending in @guest-tenant, causing false-positive domain matches.
+      if (!effectiveTenantId) {
+        const msalGuid = getGuidForDomain(itemDomain);
+        if (msalGuid) {
+          const knownDomainForMsal = await lookupDomainForGuid(msalGuid);
+          if (!knownDomainForMsal || knownDomainForMsal.toLowerCase() === itemDomain) {
+            effectiveTenantId = msalGuid;
+          }
+        }
+      }
+
+      // 4. Tenant mapping cache — previously learned domain→GUID
+      if (!effectiveTenantId) {
         const cachedGuid = await lookupTenantGuid(itemDomain);
         if (cachedGuid) {
           effectiveTenantId = cachedGuid;

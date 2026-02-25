@@ -421,9 +421,10 @@ function getTenantGuidFromPortalOnce(): string | null {
         const decoded = atob(payload);
         const claims = JSON.parse(decoded);
         const tid = claims.tid;
-        // Try to get domain from 'upn' (user principal name) or 'idp' claims
+        // Try to get domain from 'upn' (user principal name) or 'idp' claims.
+        // Skip guest UPNs (#EXT# format): tid is home tenant GUID, not the UPN domain's GUID.
         let domain: string | null = null;
-        if (claims.upn && claims.upn.includes('@')) {
+        if (claims.upn && claims.upn.includes('@') && !claims.upn.includes('#EXT#')) {
           domain = claims.upn.split('@')[1].toLowerCase();
         } else if (claims.idp) {
           domain = claims.idp.toLowerCase();
@@ -648,15 +649,128 @@ export function getTenantGuidFromPortal(): string | null {
 
 /**
  * Build a URL for copying to clipboard.
- * Uses the item's stored tenantId (resolved at save time) to inject the
- * directory GUID into the URL path for cross-directory navigation.
+ * Inserts the item's stored tenantId (directory GUID) into the URL path
+ * for cross-directory navigation. Always includes the GUID when available
+ * so the URL is shareable across directories.
  *
  * @param item - The bookmark or history entry with a pre-resolved tenantId
  */
 export function buildCopyUrl(
   item: { url: string; tenantId: string | null }
 ): string {
-  return item.tenantId ? buildNavigationUrl(item.url, item.tenantId) : item.url;
+  if (!item.tenantId) return item.url;
+
+  // Strip any existing GUID from the URL first
+  const cleanUrl = stripTenantGuidFromUrl(item.url);
+
+  // Insert the directory GUID into the URL path
+  // Format: https://portal.azure.com/{GUID}/#@domain/resource/...
+  const hashIndex = cleanUrl.indexOf('#');
+  const queryIndex = cleanUrl.indexOf('?');
+
+  let queryPart = '';
+  let hashPart = '';
+
+  if (hashIndex !== -1) {
+    hashPart = cleanUrl.substring(hashIndex);
+    if (queryIndex !== -1 && queryIndex < hashIndex) {
+      queryPart = cleanUrl.substring(queryIndex, hashIndex);
+    }
+  } else if (queryIndex !== -1) {
+    queryPart = cleanUrl.substring(queryIndex);
+  }
+
+  return `https://portal.azure.com/${item.tenantId}/${queryPart}${hashPart}`;
+}
+
+/**
+ * Look up the tenant GUID for a given domain by scanning MSAL/JWT tokens
+ * in sessionStorage and localStorage. This is domain-aware and avoids the
+ * stale-GUID problem that affects window.Portal.tenant.id after directory switches.
+ *
+ * @param domain - The tenant domain to find a GUID for (e.g. 'contoso.onmicrosoft.com')
+ */
+export function getGuidForDomain(domain: string): string | null {
+  if (!domain) return null;
+  const targetDomain = domain.toLowerCase();
+
+  try {
+    const foundTokens: Array<{ guid: string; domain: string | null }> = [];
+
+    const extractTenantInfo = (token: string): { guid: string | null; domain: string | null } => {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return { guid: null, domain: null };
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = atob(payload);
+        const claims = JSON.parse(decoded);
+        const tid = claims.tid;
+        let tokenDomain: string | null = null;
+        if (claims.upn && claims.upn.includes('@') && !claims.upn.includes('#EXT#')) {
+          // Skip guest UPNs (#EXT# format): tid is home tenant GUID, not the UPN domain's GUID
+          tokenDomain = claims.upn.split('@')[1].toLowerCase();
+        } else if (claims.idp) {
+          tokenDomain = claims.idp.toLowerCase();
+        }
+        if (tid && GUID_REGEX.test(tid)) {
+          return { guid: tid, domain: tokenDomain };
+        }
+      } catch {
+        // Invalid JWT
+      }
+      return { guid: null, domain: null };
+    };
+
+    const scanStorage = (storage: Storage) => {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key) continue;
+        if (!(key.includes('msal') || key.includes('token') || key.includes('accessToken') || key.includes('idToken'))) continue;
+
+        const val = storage.getItem(key);
+        if (!val) continue;
+
+        // Check if the storage key itself contains the target domain
+        // (MSAL sometimes includes the tenant domain in the key name)
+        const keyDomain = key.toLowerCase().includes(targetDomain) ? targetDomain : null;
+
+        // Direct JWT token
+        if (val.includes('.') && val.split('.').length === 3) {
+          const info = extractTenantInfo(val);
+          if (info.guid) foundTokens.push({ guid: info.guid, domain: keyDomain || info.domain });
+        }
+
+        // JSON-wrapped token
+        try {
+          const parsed = JSON.parse(val);
+          for (const field of ['idToken', 'accessToken', 'secret', 'credential']) {
+            if (parsed[field] && typeof parsed[field] === 'string') {
+              const info = extractTenantInfo(parsed[field]);
+              if (info.guid) foundTokens.push({ guid: info.guid, domain: keyDomain || info.domain });
+            }
+          }
+          // Direct tenantId/tid/realm fields in JSON objects
+          const directTid = parsed.tenantId || parsed.tid || parsed.realm;
+          if (directTid && GUID_REGEX.test(directTid)) {
+            foundTokens.push({ guid: directTid, domain: keyDomain });
+          }
+        } catch {
+          // Not JSON
+        }
+      }
+    };
+
+    scanStorage(sessionStorage);
+    scanStorage(localStorage);
+
+    // Find a token whose domain matches the target
+    const match = foundTokens.find(t => t.domain === targetDomain);
+    if (match) return match.guid;
+  } catch {
+    // Storage access failed
+  }
+
+  return null;
 }
 
 /**

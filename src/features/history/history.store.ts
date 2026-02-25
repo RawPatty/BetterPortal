@@ -1,8 +1,8 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal, getCurrentDirectoryInfo } from '../bookmarks/url-parser';
-import { updateTenantMapping, lookupTenantGuid } from '../bookmarks/bookmarks.store';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getGuidForDomain, getCurrentDirectoryInfo, isSameDirectory, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { updateTenantMapping, lookupTenantGuid, lookupDomainForGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
 
@@ -93,8 +93,8 @@ export const historyStore = {
       //
       // Strategy: resolve GUID at save time via multiple sources:
       // 1. URL path GUID (rare — only in BetterPortal-constructed directory-switch URLs)
-      // 2. Page context (getTenantGuidFromPortal) — safe when item's domain matches current directory
-      // 3. Tenant mapping cache — for cross-directory items where we've previously learned the GUID
+      // 2. MSAL token scan — domain-aware, avoids stale page context GUID
+      // 3. Tenant mapping cache — previously learned domain→GUID
       // 4. null — directory never visited; learnTenantMapping backfill will heal later
 
       const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
@@ -105,19 +105,38 @@ export const historyStore = {
         // 1. URL path GUID — always trust it
         effectiveTenantId = parsed.tenantId;
       } else {
-        // No GUID in URL path — try page context and cache
-        const currentDir = getCurrentDirectoryInfo();
         const itemDomain = effectiveTenantName.toLowerCase();
-        const currentDomain = currentDir.domain?.toLowerCase() ?? null;
+        const currentDir = getCurrentDirectoryInfo();
+        const sameDir = isSameDirectory(currentDir.domain, itemDomain);
 
-        if (currentDomain && itemDomain === currentDomain) {
-          // 2. Same directory — page context GUID is reliable
-          const portalGuid = getTenantGuidFromPortal();
-          if (portalGuid && GUID_REGEX.test(portalGuid)) {
-            effectiveTenantId = portalGuid;
+        // 2. Page context — window.Portal.tenant.id — only for same-directory items.
+        //    After directory switches this returns the OLD directory's GUID, so we detect
+        //    staleness: if the GUID is already cached for a DIFFERENT domain, it's stale.
+        if (sameDir) {
+          const pageGuid = getTenantGuidFromPortal();
+          if (pageGuid) {
+            const knownDomain = await lookupDomainForGuid(pageGuid);
+            if (!knownDomain || knownDomain.toLowerCase() === itemDomain) {
+              effectiveTenantId = pageGuid;
+            }
           }
-        } else {
-          // 3. Cross-directory — look up from cache
+        }
+
+        // 3. MSAL token scan — domain-aware, works for any directory with cached tokens.
+        //    Apply same staleness check as step 2: guest tokens have tid = HOME GUID but
+        //    upn ending in @guest-tenant, causing false-positive domain matches.
+        if (!effectiveTenantId) {
+          const msalGuid = getGuidForDomain(itemDomain);
+          if (msalGuid) {
+            const knownDomainForMsal = await lookupDomainForGuid(msalGuid);
+            if (!knownDomainForMsal || knownDomainForMsal.toLowerCase() === itemDomain) {
+              effectiveTenantId = msalGuid;
+            }
+          }
+        }
+
+        // 4. Tenant mapping cache — previously learned domain→GUID
+        if (!effectiveTenantId) {
           const cachedGuid = await lookupTenantGuid(itemDomain);
           if (cachedGuid) {
             effectiveTenantId = cachedGuid;
