@@ -44,21 +44,47 @@ When fixing bugs or adding features:
 ### Tenant Handling (Critical)
 The extension supports multiple Azure AD tenants/directories. Two separate concerns:
 
-1. **Grouping/Display** (`tenantName`): Use the domain from URL hash (e.g., `contoso.onmicrosoft.com`) or DOM. This is stable and consistent for grouping bookmarks/history by tenant.
+1. **Grouping/Display** (`tenantName`): Use the domain from URL hash (e.g., `contoso.onmicrosoft.com`) or DOM. Stable and consistent for grouping bookmarks/history by tenant. Note: `getTenantNameFromDOM()` tries to extract the domain from "Display Name (domain.com)" format — if it can't find the parenthesized part it returns the raw display text, so `tenantName` is NOT always a proper domain.
 
 2. **Navigation** (`tenantId`): MUST be a GUID or null. Never store domain as tenantId.
-   - **ONLY trust GUID from URL path** - this is the only reliable source
-   - If URL has GUID in path, cache the domain→GUID mapping for future lookups
-   - If URL has no GUID in path, set tenantId to null (don't try cache/MSAL - they're unreliable)
 
-**Why not trust `getTenantGuidFromPortal()` / page context / MSAL tokens?**
-- `window.Portal.tenant.id` returns the *authenticated* tenant GUID, not the browsed tenant
-- When user accesses `#@other-tenant/resource/...` without a GUID in the URL path, the portal's JS context still reflects the home tenant — storing it would give every item the same wrong GUID
-- MSAL caches tokens for ALL tenants user has authenticated to; domain matching in MSAL fallback is unreliable
-- After switching directories, MSAL may return a GUID from a different tenant
-- Cached mappings can become stale if the same domain maps to different GUIDs in different contexts
-- Using wrong GUID causes ERR_INVALID_RESPONSE errors
-- **Fix**: `bookmarks.store.ts` and `history.store.ts` no longer call `getTenantGuidFromPortal()`. When URL has no GUID in path, `effectiveTenantId` is always `null`. The `learnTenantMapping` backfill self-heals nulls when a proper `portal.azure.com/{GUID}/...` URL is later visited.
+#### GUID Resolution Cascade (bookmarks.store.ts + history.store.ts)
+
+At save time, `effectiveTenantId` is resolved by walking this cascade in order:
+
+| Step | Source | Guard | Notes |
+|------|--------|-------|-------|
+| 1 | URL path GUID | none — always trust | `portal.azure.com/{GUID}/...` |
+| 2 | `getAuthenticatedTenantGuid()` | same-directory only | Reads `data-betterportal-current-tenant` on `<html>`, written by fetch interception in `page-context.ts` |
+| 3 | `getTenantGuidFromPortal()` | same-directory + `isGuidValidForDomain` | `window.Portal.tenant.id` via event/DOM; can be stale after directory switch |
+| 4 | `getGuidForDomain(domain)` | `isGuidValidForDomain` | MSAL sessionStorage token scan; domain matched via UPN/idp/tid claims |
+| 5 | `lookupTenantGuid(domain)` | `isGuidValidForDomain`; if invalid → `removeTenantMappingEntry` | Cached domain→GUID mapping |
+| 6 | null | — | `learnTenantMapping` backfill self-heals when a URL-with-GUID is later visited |
+
+**`isGuidValidForDomain(guid, domain)`** — returns `false` if the GUID is in cache mapped to a different domain OR multiple domains (indicates cache corruption from old buggy saves). Exported from `bookmarks.store.ts`.
+
+**`learnTenantMapping(guid, domain)`** — private in each store; calls `updateTenantMapping` + backfills existing null-tenantId items for the same domain.
+
+#### Fetch Interception (page-context.ts — MAIN world)
+
+`page-context.ts` monkey-patches `window.fetch` to observe POST requests to `login.microsoftonline.com/{GUID}/oauth2/v2.0/token`. The GUID is extracted from the URL path (not the response body) and written to `document.documentElement.setAttribute('data-betterportal-current-tenant', guid)`.
+
+Two seeding paths cover sessions where no new token fetch occurs (valid cached session):
+1. **Immediate seed on load** — calls `extractGuid()` (`window.Portal.tenant.id` etc.) at `document_idle`
+2. **Lazy seed via event** — when `betterportal:get-tenant` fires (step 3 cascade call), also seeds `data-betterportal-current-tenant` if not yet set by fetch
+
+Both guards: never overwrite a fetch-intercepted value (`hasAttribute` check). The fetch-intercepted value is authoritative after directory switches.
+
+**Why fetch URL is more reliable than `window.Portal.tenant.id`:**
+- `window.Portal.tenant.id` returns the *authenticated* tenant GUID but can be stale after directory switches (the page JS context lags behind the actual navigation)
+- The GUID in the OAuth2 token endpoint URL is always exactly the tenant being authenticated to — no JWT parsing, no domain matching, no staleness risk
+
+#### Navigation (navigateToItem)
+
+`navigateToItem(url, tenantId, tenantName)` in `bookmarks.store.ts`:
+- Trusts the **stored `tenantId` directly** if it passes `GUID_REGEX` — same as `buildCopyUrl`. Do NOT add `isGuidValidForDomain` here; `tenantName` may be a display name that won't match cache keys.
+- Falls back to `lookupTenantGuid(domain)` + `isGuidValidForDomain` when `tenantId` is null
+- Only injects GUID when `!sameDirectory && tenantGuid` — same-directory navigation uses the raw URL
 
 ### URL Format (Critical for Cross-Tenant Navigation)
 **Correct format for cross-tenant navigation:**
@@ -77,8 +103,7 @@ https://portal.azure.com/12345678-1234-1234-1234-123456789abc/#@contoso.onmicros
 
 **Rules:**
 - `buildNavigationUrl()` injects GUID into path while PRESERVING the `#@domain` hash
-- Only trust GUID from URL path (when present) - cache and MSAL tokens are unreliable after directory switches
-- If URL has no GUID in path, store tenantId as null (cross-tenant navigation won't work, but same-tenant will)
+- `navigateToItem` trusts the stored `tenantId` directly (GUID_REGEX check only) — same as `buildCopyUrl`. Do NOT re-validate with `isGuidValidForDomain`; `tenantName` may be a display name, not a domain.
 - The `#@domain` format alone (without GUID in path) does NOT switch directories - it assumes you're already there
 
 ### Display Names
@@ -118,6 +143,7 @@ https://portal.azure.com/12345678-1234-1234-1234-123456789abc/#@contoso.onmicros
 | Wrong item deleted/selected | Positional index mismatch between grouped and flat views | Use ID-based lookup |
 | Clicks pass through overlay | Missing `pointer-events: auto` on interactive elements | Add to modal/panel CSS |
 | Subscription shows GUID | DOM name not being used | Detect GUID pattern, prefer DOM name |
-| Tenant switch works once then fails | Cached tenant GUID from first extraction | Never cache extracted GUID - always re-extract (user may switch tenants) |
-| All items get the same tenantId (wrong GUID) | `getTenantGuidFromPortal()` called as fallback — returns authenticated-tenant GUID even when browsing different tenant | Do NOT call `getTenantGuidFromPortal()` when storing; store null if no GUID in URL path |
+| Tenant switch works once then fails | Stale GUID in cache mapped to multiple domains | `isGuidValidForDomain` rejects multi-domain GUIDs; `removeTenantMappingEntry` self-heals on next visit |
+| All items get the same tenantId (wrong GUID) | Step 3/4 returning authenticated-tenant GUID for a different tenant | `isGuidValidForDomain` staleness check will reject it; verify cascade order and `isSameDirectory` guard on steps 2–3 |
+| Cross-tenant navigation doesn't inject GUID | `tenantId` is null (cascade fell through) or `navigateToItem` not finding it | Check cascade saved a GUID; for display-name `tenantName`, ensure stored `tenantId` is a GUID (it will be used directly) |
 
