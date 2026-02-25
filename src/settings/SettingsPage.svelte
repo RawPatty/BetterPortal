@@ -156,12 +156,6 @@
           </label>
         </div>
         <div class="bp-settings-row">
-          <label>
-            <input type="checkbox" bind:checked={settings.autoBookmark} on:change={saveSettings} />
-            Auto-bookmark visited pages
-          </label>
-        </div>
-        <div class="bp-settings-row">
           <label for="retention">Retention (days)</label>
           <input
             id="retention"
@@ -185,33 +179,6 @@
         </div>
       </section>
 
-      <!-- Diff Section -->
-      <section class="bp-settings-section">
-        <h3>Diff / Snapshots</h3>
-        <div class="bp-settings-row">
-          <label for="maxSnapshots">Max snapshots per resource</label>
-          <input
-            id="maxSnapshots"
-            type="number"
-            min="2"
-            max="20"
-            bind:value={settings.maxSnapshotsPerResource}
-            on:change={saveSettings}
-          />
-        </div>
-        <div class="bp-settings-row">
-          <label for="ignoredPaths">Ignored paths (comma-separated)</label>
-          <input
-            id="ignoredPaths"
-            type="text"
-            value={settings.diffIgnoredPaths.join(', ')}
-            on:change={(e) => {
-              settings.diffIgnoredPaths = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
-              saveSettings();
-            }}
-          />
-        </div>
-      </section>
     </div>
 
     <footer class="bp-settings-footer">

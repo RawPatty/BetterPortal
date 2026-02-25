@@ -29,10 +29,6 @@ interface Settings {
   defaultStateDepth: 'full' | 'resource';
   showStaleIndicator: boolean;
 
-  // Diff
-  diffIgnoredPaths: string[];
-  maxSnapshotsPerResource: number;
-
   // Data
   lastExportedAt: number | null;
 }
@@ -52,8 +48,6 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'light',
   defaultStateDepth: 'full',
   showStaleIndicator: true,
-  diffIgnoredPaths: ['etag', 'systemData', 'properties.provisioningState'],
-  maxSnapshotsPerResource: 5,
   lastExportedAt: null,
 };
 
@@ -119,7 +113,6 @@ interface SettingsStore {
 
 - "Clear History": delete all history entries
 - "Clear Bookmarks": delete all bookmarks (confirm dialog)
-- "Clear Snapshots": delete all snapshots
 - "Reset All": restore defaults, clear all data (confirm dialog)
 
 ---
@@ -132,7 +125,6 @@ SettingsPanel.svelte
 │   └── HotkeyRecorder.svelte
 ├── HistorySection.svelte
 ├── DisplaySection.svelte
-├── DiffSection.svelte
 ├── DataSection.svelte
 │   ├── ExportButton.svelte
 │   ├── ImportButton.svelte

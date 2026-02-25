@@ -4,7 +4,7 @@ import type { Bookmark, HistoryEntry, OverlayMode, Settings } from '../../shared
 import { bookmarkStore, navigateToItem, updateTenantMapping } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { historyStore } from '../history/history.store';
-import { getCurrentDirectoryInfo, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { getCurrentDirectoryInfo, getGuidForDomain } from '../bookmarks/url-parser';
 import { storageSyncGet, storageSyncSet } from '../../shared/storage';
 import { MAX_ITEMS } from '../../shared/constants';
 
@@ -203,12 +203,13 @@ export const overlayActions = {
     currentDirectory.set(dirInfo);
 
     // Passively cache current directory's domain → GUID mapping.
-    // getTenantGuidFromPortal() reads window.Portal.tenant.id which reliably
-    // returns the authenticated directory's GUID. By caching on every overlay
-    // open, we build up the mapping over time for use at save time.
-    const portalGuid = getTenantGuidFromPortal();
-    if (dirInfo.domain && portalGuid) {
-      updateTenantMapping(portalGuid, dirInfo.domain);
+    // Uses MSAL token scanning (domain-aware) instead of window.Portal.tenant.id
+    // which returns stale GUIDs after directory switches.
+    if (dirInfo.domain) {
+      const msalGuid = getGuidForDomain(dirInfo.domain);
+      if (msalGuid) {
+        updateTenantMapping(msalGuid, dirInfo.domain);
+      }
     }
     try {
       const [bookmarkData, settingsData, tenantAliasData] = await Promise.all([
