@@ -17,7 +17,6 @@
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
   import { buildNavigationUrl } from '../bookmarks/url-parser';
-  import { lookupTenantGuid } from '../bookmarks/bookmarks.store';
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
@@ -29,10 +28,15 @@
 
   async function copyItemUrl(item: any, event: MouseEvent) {
     event.stopPropagation();
-    // Prefer a fresh cache lookup over the stored tenantId — the cache is populated from
-    // reliable URL-path GUIDs, so it reflects the correct GUID for the item's directory
-    // even if item.tenantId was stored incorrectly (e.g. during a transitional URL state).
-    const tenantGuid = (item.tenantName ? await lookupTenantGuid(item.tenantName) : null) ?? item.tenantId;
+
+    // Use the stored tenantId directly — it's the GUID recorded when the item was saved.
+    // Guard against historic items where the GUID was incorrectly recorded as the current
+    // directory's GUID (e.g. extension loaded in dir A, saw portal.azure.com/A-guid/#@b-domain/).
+    // In that case, discard the suspect GUID rather than injecting the wrong one.
+    const isSameDir = item.tenantName?.toLowerCase() === $currentDirectory.domain?.toLowerCase();
+    const guidIsSuspect = !isSameDir && !!item.tenantId && item.tenantId === $currentDirectory.guid;
+    const tenantGuid = guidIsSuspect ? null : item.tenantId;
+
     const url = tenantGuid ? buildNavigationUrl(item.url, tenantGuid) : item.url;
     await navigator.clipboard.writeText(url);
     copiedItemId = item.id;
