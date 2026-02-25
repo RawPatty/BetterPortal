@@ -71,8 +71,8 @@ vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'mock-uuid-' + Math.random().t
 const mockLocation = { href: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123' };
 vi.stubGlobal('window', { location: mockLocation });
 
-import { bookmarkStore, migrateBookmarks, migrateBookmarksToSync, migrateBookmarksFromSync } from './bookmarks.store';
-import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal, getAuthenticatedTenantGuid } from './url-parser';
+import { bookmarkStore, navigateToItem, migrateBookmarks, migrateBookmarksToSync, migrateBookmarksFromSync } from './bookmarks.store';
+import { parsePortalUrl, getGuidForDomain, getTenantGuidFromPortal, getAuthenticatedTenantGuid, isSameDirectory } from './url-parser';
 import type { BookmarkSaveResult } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
 import { settingsStore } from '../settings/settings.store';
@@ -353,6 +353,49 @@ describe('bookmarkStore', () => {
       // url is NOT modified — GUID lives only in tenantId
       expect(fixed.url).not.toContain(domainGuid);
     });
+  });
+});
+
+describe('navigateToItem', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    mockLocation.href = 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123';
+  });
+
+  it('injects stored GUID into URL for cross-directory item', async () => {
+    vi.mocked(isSameDirectory).mockReturnValueOnce(false);
+    const guid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+    await navigateToItem(
+      'https://portal.azure.com/#@other-tenant.onmicrosoft.com/resource/sub-123',
+      guid,
+      'other-tenant.onmicrosoft.com'
+    );
+
+    expect(mockLocation.href).toContain(guid);
+  });
+
+  it('injects stored GUID even when tenantName is a display name (not a domain)', async () => {
+    // Simulate the case where tenantName is a display name like "Contoso" instead of
+    // "contoso.onmicrosoft.com". The GUID should still be injected — isGuidValidForDomain
+    // should not be used to validate the stored tenantId.
+    const { updateTenantMapping } = await import('./bookmarks.store');
+    const guid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+    // Cache has GUID mapped to the real domain
+    await updateTenantMapping(guid, 'other-tenant.onmicrosoft.com');
+
+    vi.mocked(isSameDirectory).mockReturnValueOnce(false);
+
+    // Navigate with a display name as tenantName (doesn't match the cache key)
+    await navigateToItem(
+      'https://portal.azure.com/#@other-tenant.onmicrosoft.com/resource/sub-123',
+      guid,
+      'Other Tenant Display Name'
+    );
+
+    // GUID must still be injected — don't let isGuidValidForDomain reject it
+    expect(mockLocation.href).toContain(guid);
   });
 });
 

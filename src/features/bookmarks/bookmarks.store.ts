@@ -202,12 +202,14 @@ export async function navigateToItem(url: string, tenantId: string | null, tenan
   const domain = tenantName?.toLowerCase() || null;
   const sameDirectory = isSameDirectory(currentDir.domain, domain);
 
-  // Validate the stored tenantId — old bookmarks may have a corrupt GUID (same GUID
-  // stored for multiple domains by previous buggy code). If invalid, don't inject it.
+  // Trust the stored tenantId directly — it was validated at save time, same as buildCopyUrl.
+  // Do NOT re-validate with isGuidValidForDomain here: tenantName may be a display name
+  // ("Contoso") not a domain ("contoso.onmicrosoft.com"), causing false rejections.
   let tenantGuid: string | null = null;
-  if (tenantId && domain && await isGuidValidForDomain(tenantId, domain)) {
+  if (tenantId && GUID_REGEX.test(tenantId)) {
     tenantGuid = tenantId;
-  } else if (!tenantGuid && domain) {
+  } else if (domain) {
+    // Fallback: cache lookup (validate here since cache source is less controlled)
     const cachedGuid = await lookupTenantGuid(domain);
     if (cachedGuid && await isGuidValidForDomain(cachedGuid, domain)) {
       tenantGuid = cachedGuid;
