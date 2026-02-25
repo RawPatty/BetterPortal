@@ -35,6 +35,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   getTenantNameFromDOM: vi.fn(() => 'Test Tenant'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
   getTenantGuidFromPortal: vi.fn(() => null),
+  getCurrentDirectoryInfo: vi.fn(() => ({ domain: 'test.onmicrosoft.com', guid: null })),
   isErrorPage: vi.fn(() => false), // Mock as not an error page by default
   buildNavigationUrl: vi.fn((url: string, tenantId: string) => {
     if (!tenantId || tenantId === 'unknown') return url;
@@ -56,7 +57,7 @@ vi.mock('../bookmarks/url-parser', () => ({
 
 import { historyStore } from './history.store';
 import { storageGet, storageSet } from '../../shared/storage';
-import { parsePortalUrl, getTenantGuidFromPortal } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantGuidFromPortal, getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 
 describe('historyStore', () => {
   beforeEach(() => {
@@ -524,6 +525,85 @@ describe('historyStore', () => {
       expect(entry!.tenantId).toBe(urlGuid);
       // Cache should now have the correct GUID
       expect(mockStorage['tenantMapping']['contoso.onmicrosoft.com']).toBe(urlGuid);
+    });
+  });
+
+  describe('tenant GUID resolution at save time', () => {
+    it('should store GUID from page context when item domain matches current directory', async () => {
+      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
+      // Ensure getCurrentDirectoryInfo returns matching domain
+      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
+        domain: 'contoso.onmicrosoft.com',
+        guid: null,
+      });
+      // getTenantNameFromDOM returns null so effectiveTenantName falls through to parsed.tenantDomain
+      const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
+      vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
+      } as any);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBe(pageContextGuid);
+    });
+
+    it('should store null tenantId when domains do not match and cache has no mapping', async () => {
+      const pageContextGuid = '99999999-9999-9999-9999-999999999999';
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce(pageContextGuid);
+      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
+        domain: 'fabrikam.onmicrosoft.com',
+        guid: null,
+      });
+      const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
+      vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
+      } as any);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBeNull();
+    });
+
+    it('should store GUID from cache for cross-directory item', async () => {
+      // Populate cache
+      const { updateTenantMapping } = await import('../bookmarks/bookmarks.store');
+      await updateTenantMapping('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'contoso.onmicrosoft.com');
+
+      vi.mocked(getTenantGuidFromPortal).mockReturnValueOnce('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+      vi.mocked(getCurrentDirectoryInfo).mockReturnValueOnce({
+        domain: 'fabrikam.onmicrosoft.com',
+        guid: null,
+      });
+      const { getTenantNameFromDOM } = await import('../bookmarks/url-parser');
+      vi.mocked(getTenantNameFromDOM).mockReturnValueOnce(null);
+
+      vi.mocked(parsePortalUrl).mockReturnValueOnce({
+        tenantId: null,
+        tenantDomain: 'contoso.onmicrosoft.com',
+        resourceId: '/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app',
+        blade: null,
+        fullUrl: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123',
+      } as any);
+
+      const result = await historyStore.upsert('https://portal.azure.com/#@contoso.onmicrosoft.com/resource/subscriptions/sub-123/resourceGroups/rg-test/providers/Microsoft.Web/sites/my-app');
+
+      expect(result).not.toBeNull();
+      expect(result!.tenantId).toBe('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
     });
   });
 

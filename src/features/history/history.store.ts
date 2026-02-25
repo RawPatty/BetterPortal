@@ -1,7 +1,7 @@
 // History store for BetterPortal
 import { storageGet, storageSet } from '../../shared/storage';
 import type { HistoryEntry, Settings } from '../../shared/types';
-import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage } from '../bookmarks/url-parser';
+import { parsePortalUrl, getTenantNameFromDOM, getResourceNameFromDOM, extractResourceName, extractDisplayName, stripTenantGuidFromUrl, isErrorPage, getTenantGuidFromPortal, getCurrentDirectoryInfo } from '../bookmarks/url-parser';
 import { updateTenantMapping, lookupTenantGuid } from '../bookmarks/bookmarks.store';
 import { settingsStore } from '../settings/settings.store';
 import { MAX_ITEMS, GUID_REGEX } from '../../shared/constants';
@@ -89,33 +89,46 @@ export const historyStore = {
 
       const all = await this.getAll();
 
-      // Determine tenant ID for navigation (MUST be GUID) and tenant name for grouping
-      // tenantId: Used for cross-tenant navigation - MUST be a GUID, null if unavailable
-      // tenantName: Used for grouping/display - should be the domain for consistent grouping
+      // Determine tenant ID for navigation and tenant name for grouping
       //
-      // Strategy: ONLY trust the URL path GUID.
-      // - URL has GUID in path → use it (also cache the domain→GUID mapping for backfill).
-      // - URL has no GUID in path → store null. Do NOT fall back to getTenantGuidFromPortal():
-      //   page context (window.Portal.tenant.id) returns the *authenticated* tenant GUID, but
-      //   when a user browses a cross-tenant resource via #@domain/resource/... the portal's JS
-      //   context still reflects the home tenant, so getTenantGuidFromPortal() returns a stale
-      //   GUID that poisons every item with the same wrong value.
-      //   The backfill in learnTenantMapping self-heals nulls when a GUID URL is later visited.
+      // Strategy: resolve GUID at save time via multiple sources:
+      // 1. URL path GUID (rare — only in BetterPortal-constructed directory-switch URLs)
+      // 2. Page context (getTenantGuidFromPortal) — safe when item's domain matches current directory
+      // 3. Tenant mapping cache — for cross-directory items where we've previously learned the GUID
+      // 4. null — directory never visited; learnTenantMapping backfill will heal later
 
       const effectiveTenantName = getTenantNameFromDOM() || parsed.tenantDomain || 'Unknown Tenant';
 
-      // Determine effective tenant ID for navigation - MUST be a GUID or null
       let effectiveTenantId: string | null = null;
 
       if (parsed.tenantId && GUID_REGEX.test(parsed.tenantId)) {
-        // URL path GUID is the only reliable source — always trust it and cache the mapping.
+        // 1. URL path GUID — always trust it
         effectiveTenantId = parsed.tenantId;
-        if (parsed.tenantDomain) {
-          await learnTenantMapping(parsed.tenantId, parsed.tenantDomain);
+      } else {
+        // No GUID in URL path — try page context and cache
+        const currentDir = getCurrentDirectoryInfo();
+        const itemDomain = effectiveTenantName.toLowerCase();
+        const currentDomain = currentDir.domain?.toLowerCase() ?? null;
+
+        if (currentDomain && itemDomain === currentDomain) {
+          // 2. Same directory — page context GUID is reliable
+          const portalGuid = getTenantGuidFromPortal();
+          if (portalGuid && GUID_REGEX.test(portalGuid)) {
+            effectiveTenantId = portalGuid;
+          }
+        } else {
+          // 3. Cross-directory — look up from cache
+          const cachedGuid = await lookupTenantGuid(itemDomain);
+          if (cachedGuid) {
+            effectiveTenantId = cachedGuid;
+          }
         }
       }
-      // else: no GUID in URL path → effectiveTenantId stays null.
-      // Do NOT call getTenantGuidFromPortal() — see strategy comment above.
+
+      // Cache the mapping and backfill existing items with null tenantId for this domain
+      if (effectiveTenantId && parsed.tenantDomain) {
+        await learnTenantMapping(effectiveTenantId, parsed.tenantDomain);
+      }
 
       // Strip any tenant GUID from the stored URL — the url field should be the canonical
       // resource URL. The GUID is stored separately in tenantId and injected at navigation/copy time.
