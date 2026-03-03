@@ -1,30 +1,41 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { crx } from '@crxjs/vite-plugin';
-import manifest from './src/manifest.json';
-import { copyFileSync } from 'fs';
+import webExtension from '@samrum/vite-plugin-web-extension';
+import { readFileSync, copyFileSync, mkdirSync } from 'fs';
+
+const target = process.env.TARGET || 'chrome';
+const outDir = target === 'firefox' ? 'dist-firefox' : 'dist';
+const manifestPath =
+  target === 'firefox' ? './src/manifest.firefox.json' : './src/manifest.chrome.json';
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
 
 export default defineConfig({
   plugins: [
     svelte(),
-    crx({ manifest }),
+    webExtension({ manifest }),
     {
-      name: 'copy-license',
+      name: 'copy-static-assets',
       closeBundle() {
-        // Copy LICENSE to dist after build
         try {
-          copyFileSync('LICENSE', 'dist/LICENSE');
-          console.log('LICENSE copied to dist/');
+          copyFileSync('LICENSE', `${outDir}/LICENSE`);
+        } catch {
+          // LICENSE may not exist
+        }
+        try {
+          mkdirSync(`${outDir}/src/icons`, { recursive: true });
+          for (const size of ['16', '48', '128']) {
+            copyFileSync(`src/icons/icon${size}.png`, `${outDir}/src/icons/icon${size}.png`);
+          }
         } catch (err) {
-          console.warn('Could not copy LICENSE:', err);
+          console.warn('Could not copy icons:', err);
         }
       },
     },
   ],
   build: {
+    outDir,
     rollupOptions: {
       input: {
-        popup: 'src/popup/index.html',
         settings: 'src/settings/index.html',
       },
     },

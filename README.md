@@ -24,11 +24,14 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 # Install dependencies
 npm install
 
-# Build for development
-npm run dev
-
-# Build for production
+# Build for Chrome (default)
 npm run build
+
+# Build for Firefox
+npm run build:firefox
+
+# Build both
+npm run build && npm run build:firefox
 
 # Run tests
 npm test
@@ -37,10 +40,18 @@ npm test
 ### Load in Chrome
 
 1. Run `npm run build` to create the `dist/` folder
-2. Open Chrome and navigate to `chrome://extensions`
+2. Open Chrome → `chrome://extensions`
 3. Enable "Developer mode" (toggle in top right)
 4. Click "Load unpacked" and select the `dist/` folder
 5. Navigate to `portal.azure.com` and press `Ctrl+Space`
+
+### Load in Firefox
+
+1. Run `npm run build:firefox` to create the `dist-firefox/` folder
+2. Open Firefox → `about:debugging#/runtime/this-firefox`
+3. Click "Load Temporary Add-on"
+4. Select any file inside the `dist-firefox/` folder
+5. Minimum Firefox version: **128** (June 2024)
 
 ## Usage
 
@@ -85,10 +96,10 @@ npm test
 ## Tech Stack
 
 - **UI**: Svelte 4
-- **Build**: Vite + CRXJS
+- **Build**: Vite + vite-plugin-web-extension
 - **Language**: TypeScript
 - **Testing**: Vitest + Testing Library
-- **Extension**: Chrome Manifest V3
+- **Extension**: Chrome & Firefox Manifest V3
 
 ## Project Structure
 
@@ -141,10 +152,20 @@ npm run test:watch # Explicit watch mode
 ### Building
 
 ```bash
-npm run build
+npm run build           # Chrome → dist/
+npm run build:firefox   # Firefox → dist-firefox/
 ```
 
-Output is in `dist/` folder, ready for Chrome extension loading.
+### Firefox Release (AMO)
+
+```bash
+npm run build:firefox          # build the extension
+npm run lint:firefox           # check AMO compliance
+npm run package:firefox        # create .xpi in web-ext-artifacts/
+```
+
+Submit the `.xpi` to [addons.mozilla.org](https://addons.mozilla.org).
+Mozilla requires a source code zip alongside minified builds — attach the repo source zip to the submission.
 
 ## Contributing
 
@@ -184,11 +205,34 @@ Contributions are welcome! Here's how you can help:
 - ✅ Copy-to-clipboard for history items and directory headers
 - ✅ Configurable history limit and retention
 
+- ✅ Firefox support (Firefox 128+)
+
 ### Planned
 - 🔄 Advanced filtering and tagging
-- 🔄 Browser support (Firefox, Edge)
+- 🔄 Edge support
 
 **Note:** The core extension will remain free and open source.
+
+## Troubleshooting
+
+### Bookmarks navigating to the wrong tenant
+
+Occasionally a bookmark may be saved with an incorrect or missing tenant GUID, causing cross-tenant navigation to fail or land in the wrong directory. This can happen when:
+
+- The Azure Portal's internal state was stale at the time the bookmark was saved (e.g., shortly after switching directories)
+- No OAuth token fetch was intercepted for that session, so the extension fell back to less reliable detection methods
+
+**Automatic recovery (for missing GUIDs only):** Simply navigate to the affected tenant via a URL that includes the GUID in the path (e.g., from an email link or another cross-tenant bookmark that works). The extension will detect the GUID and automatically backfill any same-tenant bookmarks that are missing it.
+
+**Manual fix (for wrong GUIDs, or when automatic recovery doesn't help):**
+
+1. Navigate to the affected tenant in Azure Portal and note the GUID in the URL: `portal.azure.com/{GUID}/...`
+2. Click the extension icon and export all your bookmarks as JSON (Export Data)
+3. Open the JSON file and update the `tenantId` field to the correct GUID for each affected bookmark
+4. Delete the affected bookmarks (or all bookmarks if fixing multiple tenants)
+5. Re-import the modified JSON file
+
+The import stores the `tenantId` you provide directly, so the corrected values will be used immediately for all future navigation.
 
 ## Privacy
 

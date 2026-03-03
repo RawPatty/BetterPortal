@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "BetterPortal",
+  "description": "Bookmark Azure Portal resources for instant revisits. Keyboard-driven overlay with history, cross-tenant navigation, and search.",
+  "version": "1.0.97",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "betterportal@rawpatty.com",
+      "strict_min_version": "128.0"
+    }
+  },
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://portal.azure.com/*"
+  ],
+  "background": {
+    "scripts": ["src/background/index.ts"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://portal.azure.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://portal.azure.com/*"],
+      "js": ["src/content/page-context.ts"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "48": "src/icons/icon48.png"
+    }
+  }
+}

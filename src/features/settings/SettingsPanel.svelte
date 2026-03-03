@@ -6,6 +6,7 @@
   import AboutModal from './AboutModal.svelte';
   import { migrateBookmarksToSync, migrateBookmarksFromSync, bookmarkStore } from '../bookmarks/bookmarks.store';
   import { MAX_ITEMS } from '../../shared/constants';
+  import { isFirefox } from '../../shared/browser';
 
   export let isOpen: boolean = false;
 
@@ -268,6 +269,9 @@
           {#if bookmarkSyncError}
             <div class="bp-error">{bookmarkSyncError}</div>
           {/if}
+          {#if isFirefox()}
+            <div class="bp-sync-note">Firefox: requires a Firefox account for sync to work across devices.</div>
+          {/if}
         </section>
 
       </div>
@@ -497,5 +501,11 @@
     font-size: 12px;
     color: var(--bp-text-secondary, #666);
     font-style: italic;
+  }
+
+  .bp-sync-note {
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+    margin-top: 4px;
   }
 </style>

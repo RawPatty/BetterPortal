@@ -23,7 +23,11 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "cross-env TARGET=chrome vite build",
+    "build:chrome": "cross-env TARGET=chrome vite build",
+    "build:firefox": "cross-env TARGET=firefox vite build",
+    "package:firefox": "web-ext build --source-dir dist-firefox --artifacts-dir web-ext-artifacts",
+    "lint:firefox": "web-ext lint --source-dir dist-firefox",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -33,18 +37,20 @@
     "fuzzysort": "^3.0.2"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.28",
+    "@samrum/vite-plugin-web-extension": "^5.1.1",
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
     "@testing-library/svelte": "^5.2.6",
     "@tsconfig/svelte": "^5.0.4",
     "@types/chrome": "^0.0.287",
     "@types/deep-diff": "^1.0.5",
+    "cross-env": "^10.1.0",
     "deep-diff": "^1.0.2",
     "jsdom": "^25.0.1",
     "svelte": "^4.2.19",
     "svelte-check": "^4.1.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "web-ext": "^9.3.0"
   }
 }

@@ -3,8 +3,9 @@ Use vitest to test your features and write sensible tests for each bug you end u
 ## Release Process
 
 When making updates:
-- **Bump the version** in both `src/manifest.json` and `package.json` (keep them in sync)
+- **Bump the version** in `src/manifest.chrome.json`, `src/manifest.firefox.json`, and `package.json` (keep all three in sync)
 - **Push to GitHub** after committing changes
+- **Firefox release**: run `npm run build:firefox && npm run package:firefox`, submit `.xpi` to AMO
 
 ## How to Add Features
 
