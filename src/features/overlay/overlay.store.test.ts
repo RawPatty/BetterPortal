@@ -39,6 +39,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   })),
   extractDisplayName: vi.fn(() => 'my-app'),
   extractResourceName: vi.fn(() => 'my-app'),
+  isResourcePage: vi.fn(() => true),
   getTenantNameFromDOM: vi.fn(() => 'test.onmicrosoft.com'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
   getGuidForDomain: vi.fn(() => null),
@@ -64,7 +65,7 @@ vi.mock('../history/history.store', () => ({
 
 import { overlayActions, tenantAliases, filteredItems, bookmarks, searchQuery, selectedIndex, currentDirectory, currentDirectoryDisplay, itemsByTenant, overlayError } from './overlay.store';
 import { storageGet, storageSet, storageSyncSet } from '../../shared/storage';
-import { getCurrentDirectoryInfo } from '../bookmarks/url-parser';
+import { getCurrentDirectoryInfo, isResourcePage } from '../bookmarks/url-parser';
 import { get } from 'svelte/store';
 
 describe('overlayActions', () => {
@@ -396,6 +397,15 @@ describe('overlayError on limit_reached', () => {
     expect(get(overlayError)).toBe(
       'Bookmark limit reached (150/150) — remove bookmarks to add more.'
     );
+  });
+
+  it('sets overlayError when page is not a resource page', async () => {
+    mockStorage['bookmarks'] = [];
+    vi.mocked(isResourcePage).mockReturnValueOnce(false);
+
+    await overlayActions.saveCurrentPage();
+
+    expect(get(overlayError)).toBe('Navigate to a resource to bookmark it.');
   });
 });
 

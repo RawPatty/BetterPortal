@@ -32,6 +32,7 @@ vi.mock('../bookmarks/url-parser', () => ({
   })),
   extractDisplayName: vi.fn(() => 'my-app'),
   extractResourceName: vi.fn(() => 'my-app'),
+  isResourcePage: vi.fn(() => true),
   getTenantNameFromDOM: vi.fn(() => 'test.onmicrosoft.com'),
   getResourceNameFromDOM: vi.fn(() => 'my-app'),
   getGuidForDomain: vi.fn(() => null),

@@ -319,6 +319,8 @@ export const overlayActions = {
         setOverlayError(
           `Bookmark limit reached (${MAX_ITEMS.BOOKMARKS}/${MAX_ITEMS.BOOKMARKS}) — remove bookmarks to add more.`
         );
+      } else if (result.reason === 'not_resource_page') {
+        setOverlayError('Navigate to a resource to bookmark it.');
       }
       return;
     }

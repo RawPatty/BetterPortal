@@ -18,7 +18,8 @@ export interface Bookmark {
 
 export type BookmarkSaveResult =
   | { success: true; bookmark: Bookmark }
-  | { success: false; reason: 'limit_reached' };
+  | { success: false; reason: 'limit_reached' }
+  | { success: false; reason: 'not_resource_page' };
 
 // ============ History ============
 export interface HistoryEntry {

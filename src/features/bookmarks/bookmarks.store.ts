@@ -13,6 +13,7 @@ import {
   buildNavigationUrl,
   getCurrentDirectoryInfo,
   isSameDirectory,
+  isResourcePage,
   getGuidForDomain,
   getTenantGuidFromPortal,
   getAuthenticatedTenantGuid,
@@ -279,6 +280,11 @@ export const bookmarkStore = {
     stateDepth?: 'full' | 'resource';
   }): Promise<BookmarkSaveResult> {
     const url = window.location.href;
+
+    if (!isResourcePage(url)) {
+      return { success: false, reason: 'not_resource_page' };
+    }
+
     const parsed = parsePortalUrl(url);
     const settings = await settingsStore.get();
 
