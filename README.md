@@ -4,6 +4,8 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 
 > **Open Source** | Privacy-focused | All data stored locally or synced via your Chrome account
 
+**Install:** [Chrome Web Store](https://chromewebstore.google.com/detail/betterportal/lfncmeppbeoclipcofoecmiokloajbaa) | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/betterportal-azure/)
+
 ![BetterPortal in action](screenshots/betterportal-irl-example.webp)
 
 ## Features
