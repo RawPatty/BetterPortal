@@ -4,6 +4,8 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 
 > **Open Source** | Privacy-focused | All data stored locally or synced via your Chrome account
 
+![BetterPortal in action](screenshots/betterportal-irl-example.webp)
+
 ## Features
 
 - **Quick Access Overlay**: Press `Ctrl+Space` to open a command palette-style overlay
@@ -15,6 +17,10 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 - **Multi-tenant Support**: Automatic directory switching when navigating
 - **Directory Aliases**: Rename tenant directories with friendly names
 - **Current Directory Display**: Overlay header shows which Azure directory you're in
+
+| Bookmarks | Settings |
+|:-:|:-:|
+| ![Bookmarks](screenshots/BladesExample.png) | ![Settings](screenshots/SettingsExample.png) |
 
 ## Installation
 
