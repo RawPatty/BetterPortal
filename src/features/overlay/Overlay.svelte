@@ -48,6 +48,10 @@
   let copiedItemId: string | null = null;
   let copiedTenantKey: string | null = null;
 
+  // Vim navigation state
+  let lastKey: string | null = null;
+  let lastKeyTimer: ReturnType<typeof setTimeout> | null = null;
+
   async function copyItemUrl(item: any, event: MouseEvent) {
     event.stopPropagation();
     const url = buildCopyUrl(item);
@@ -206,6 +210,46 @@
     if (event.key === 'Enter') {
       event.preventDefault();
       overlayActions.selectCurrent();
+      return;
+    }
+
+    // gg — jump to first item (double-g chord, 500 ms window)
+    if (event.key === 'g' && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      if (lastKey === 'g') {
+        event.preventDefault();
+        if (lastKeyTimer) clearTimeout(lastKeyTimer);
+        lastKey = null;
+        selectedIndex.set(0);
+        scrollToSelected();
+        return;
+      }
+      lastKey = 'g';
+      if (lastKeyTimer) clearTimeout(lastKeyTimer);
+      lastKeyTimer = setTimeout(() => { lastKey = null; }, 500);
+      return;
+    }
+
+    // G — jump to last item (fixed vim navigation, Shift+g)
+    if (event.key === 'G' && event.shiftKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      selectedIndex.set(flatItems.length - 1);
+      scrollToSelected();
+      return;
+    }
+
+    // Ctrl+D — half-page down (fixed, 5 items)
+    if (event.key === 'd' && event.ctrlKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      selectedIndex.set(Math.min($selectedIndex + 5, flatItems.length - 1));
+      scrollToSelected();
+      return;
+    }
+
+    // Ctrl+U — half-page up (fixed, 5 items)
+    if (event.key === 'u' && event.ctrlKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      selectedIndex.set(Math.max($selectedIndex - 5, 0));
+      scrollToSelected();
       return;
     }
 
