@@ -15,7 +15,7 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 - **Bookmark Sync**: Optionally sync bookmarks across devices via your Chrome account (up to 150 bookmarks)
 - **History**: Auto-capture visited resources with copy-to-clipboard support
 - **Import/Export**: Backup and restore bookmarks as JSON
-- **Vim-style Navigation**: `j`/`k` to navigate, `Enter` to select, `/` to search
+- **Vim-style Navigation**: `j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U` for fast navigation; `y` to copy URL; `o` to open in new tab
 - **Multi-tenant Support**: Automatic directory switching when navigating
 - **Directory Aliases**: Rename tenant directories with friendly names
 - **Current Directory Display**: Overlay header shows which Azure directory you're in
@@ -65,26 +65,40 @@ npm test
 
 ### Keyboard Shortcuts
 
+**Fixed keys** (always active, not remappable):
+
 | Key | Action |
 |-----|--------|
-| `Ctrl+Space` | Open/close overlay (customizable) |
-| `j` / `k` | Navigate down/up |
+| `Ctrl+Space` | Open / close overlay (default — remappable in Settings) |
+| `↑` / `↓` | Navigate up / down |
+| `j` / `k` | Navigate down / up (vim) |
+| `gg` | Jump to first item |
+| `G` | Jump to last item |
+| `Ctrl+D` | Jump down 5 items |
+| `Ctrl+U` | Jump up 5 items |
 | `Enter` | Open selected item |
+| `Esc` | Close overlay / exit search |
+
+**Configurable keys** (defaults shown — change in Settings → Keybinds):
+
+| Default | Action |
+|---------|--------|
 | `/` | Focus search |
-| `Esc` | Close overlay |
-| `a` | Bookmark current page, or convert selected history item to bookmark |
-| `d` | Delete selected bookmark |
-| `r` | Rename selected bookmark or directory header |
+| `a` | Bookmark current page, or promote history item to bookmark |
+| `d` | Delete selected item |
+| `e` | Edit / rename selected bookmark or directory header |
 | `?` | Open settings |
+| `y` | Copy URL of selected item |
+| `o` | Open selected item in new tab |
 
 ### Bookmarks
 
 - Press `a` on any Azure resource page to save a bookmark
 - Bookmarks include the tenant context for automatic directory switching
 - Choose between "full" state (includes blade) or "resource only" depth
-- Press `r` on a selected bookmark to rename it inline
+- Press `e` on a selected bookmark to rename it inline
 - **Sync**: Enable bookmark sync in Settings to keep bookmarks in sync across all your Chrome devices (up to 150 bookmarks). When the limit is reached, an error banner is shown in the overlay.
-- Bookmarks are grouped by directory; press `r` on a directory header to assign it a friendly alias
+- Bookmarks are grouped by directory; press `e` on a directory header to assign it a friendly alias
 
 ### History
 
