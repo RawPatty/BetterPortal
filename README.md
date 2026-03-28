@@ -89,7 +89,7 @@ npm test
 | `e` | Edit / rename selected bookmark or directory header |
 | `?` | Open settings |
 | `y` | Copy URL of selected item |
-| `o` | Open selected item in new tab |
+| `t` | Open selected item in new tab |
 
 ### Bookmarks
 

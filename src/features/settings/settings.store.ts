@@ -11,8 +11,17 @@ export const settingsStore = {
     if (!stored) {
       return { ...DEFAULT_SETTINGS };
     }
-    // Merge with defaults to handle new fields
-    return { ...DEFAULT_SETTINGS, ...stored };
+    // Deep-merge overlayKeybinds so new keybind fields get their defaults
+    // even for users who have older stored settings that predate those fields.
+    // (Top-level spread alone would let stored.overlayKeybinds silently drop new keys.)
+    return {
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      overlayKeybinds: {
+        ...DEFAULT_SETTINGS.overlayKeybinds,
+        ...(stored.overlayKeybinds ?? {}),
+      },
+    };
   },
 
   /**

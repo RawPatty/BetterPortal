@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
     edit:     { key: 'e', ctrl: false, shift: false, alt: false, meta: false },
     settings: { key: '?', ctrl: false, shift: true, alt: false, meta: false },
     yank:       { key: 'y', ctrl: false, shift: false, alt: false, meta: false },
-    openNewTab: { key: 'o', ctrl: false, shift: false, alt: false, meta: false },
+    openNewTab: { key: 't', ctrl: false, shift: false, alt: false, meta: false },
   },
   lastExportedAt: null,
   bookmarkSyncEnabled: false,
