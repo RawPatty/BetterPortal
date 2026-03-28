@@ -13,7 +13,6 @@ export interface Bookmark {
   createdAt: number;
   lastAccessed: number;
   accessCount: number;
-  isStale: boolean;
 }
 
 export type BookmarkSaveResult =
@@ -42,6 +41,16 @@ export interface HotkeyConfig {
   meta: boolean;
 }
 
+export interface OverlayKeybinds {
+  navDown: HotkeyConfig | null;
+  navUp: HotkeyConfig | null;
+  search: HotkeyConfig | null;
+  add: HotkeyConfig | null;
+  delete: HotkeyConfig | null;
+  edit: HotkeyConfig | null;
+  settings: HotkeyConfig | null;
+}
+
 export interface Settings {
   hotkey: HotkeyConfig;
   historyEnabled: boolean;
@@ -49,7 +58,7 @@ export interface Settings {
   historyMaxEntries: number;
   theme: 'light' | 'dark';
   defaultStateDepth: 'full' | 'resource';
-  showStaleIndicator: boolean;
+  overlayKeybinds: OverlayKeybinds;
   lastExportedAt: number | null;
   bookmarkSyncEnabled: boolean;
 }
@@ -59,9 +68,17 @@ export const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   historyRetentionDays: 30,
   historyMaxEntries: 20,
-  theme: 'light',
+  theme: 'dark',
   defaultStateDepth: 'full',
-  showStaleIndicator: true,
+  overlayKeybinds: {
+    navDown:  { key: 'j', ctrl: false, shift: false, alt: false, meta: false },
+    navUp:    { key: 'k', ctrl: false, shift: false, alt: false, meta: false },
+    search:   { key: '/', ctrl: false, shift: false, alt: false, meta: false },
+    add:      { key: 'a', ctrl: false, shift: false, alt: false, meta: false },
+    delete:   { key: 'd', ctrl: false, shift: false, alt: false, meta: false },
+    edit:     { key: 'e', ctrl: false, shift: false, alt: false, meta: false },
+    settings: { key: '?', ctrl: false, shift: false, alt: false, meta: false },
+  },
   lastExportedAt: null,
   bookmarkSyncEnabled: false,
 };
