@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import SettingsPanel from './SettingsPanel.svelte';
+import { DEFAULT_SETTINGS } from '../../shared/types';
 
 // Mock chrome.storage API
 vi.stubGlobal('chrome', {
@@ -15,6 +16,12 @@ vi.stubGlobal('chrome', {
 describe('SettingsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('defaults', () => {
+    it('should default to dark theme for new users', () => {
+      expect(DEFAULT_SETTINGS.theme).toBe('dark');
+    });
   });
 
   describe('pointer-events', () => {
@@ -54,12 +61,12 @@ describe('SettingsPanel', () => {
       expect(screen.getByText('Settings')).toBeDefined();
     });
 
-    it('should display keyboard shortcut section', async () => {
+    it('should display keybinds button in footer', async () => {
       render(SettingsPanel, {
         props: { isOpen: true },
       });
 
-      expect(screen.getByText('Keyboard Shortcut')).toBeDefined();
+      expect(screen.getByText('Keybinds')).toBeDefined();
     });
 
     it('should display display section', async () => {
