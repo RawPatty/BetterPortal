@@ -49,6 +49,8 @@ export interface OverlayKeybinds {
   delete: HotkeyConfig | null;
   edit: HotkeyConfig | null;
   settings: HotkeyConfig | null;
+  yank: HotkeyConfig | null;
+  openNewTab: HotkeyConfig | null;
 }
 
 export interface Settings {
@@ -78,6 +80,8 @@ export const DEFAULT_SETTINGS: Settings = {
     delete:   { key: 'd', ctrl: false, shift: false, alt: false, meta: false },
     edit:     { key: 'e', ctrl: false, shift: false, alt: false, meta: false },
     settings: { key: '?', ctrl: false, shift: true, alt: false, meta: false },
+    yank:       { key: 'y', ctrl: false, shift: false, alt: false, meta: false },
+    openNewTab: { key: 'o', ctrl: false, shift: false, alt: false, meta: false },
   },
   lastExportedAt: null,
   bookmarkSyncEnabled: false,
