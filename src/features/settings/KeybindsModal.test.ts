@@ -43,6 +43,8 @@ describe('KeybindsModal', () => {
     expect(screen.getByText('Delete selected')).toBeDefined();
     expect(screen.getByText('Edit / rename')).toBeDefined();
     expect(screen.getByText('Open settings')).toBeDefined();
+    expect(screen.getByText('Copy URL')).toBeDefined();
+    expect(screen.getByText('Open in new tab')).toBeDefined();
   });
 
   it('shows Reset to Defaults and Done buttons', () => {

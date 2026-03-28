@@ -94,17 +94,19 @@
     );
   }
 
-  const OVERLAY_FIELDS = ['navDown', 'navUp', 'search', 'add', 'delete', 'edit', 'settings'] as const;
+  const OVERLAY_FIELDS = ['navDown', 'navUp', 'search', 'add', 'delete', 'edit', 'settings', 'yank', 'openNewTab'] as const;
   type OverlayField = typeof OVERLAY_FIELDS[number];
 
   const FIELD_LABELS: Record<string, string> = {
-    navDown:  'Navigate down',
-    navUp:    'Navigate up',
-    search:   'Search',
-    add:      'Add bookmark',
-    delete:   'Delete selected',
-    edit:     'Edit / rename',
-    settings: 'Open settings',
+    navDown:    'Navigate down',
+    navUp:      'Navigate up',
+    search:     'Search',
+    add:        'Add bookmark',
+    delete:     'Delete selected',
+    edit:       'Edit / rename',
+    settings:   'Open settings',
+    yank:       'Copy URL',
+    openNewTab: 'Open in new tab',
   };
 
   function getKeybind(field: string): HotkeyConfig | null {
@@ -276,11 +278,13 @@
           <h3>Actions</h3>
 
           {#each [
-            { field: 'search',   label: 'Search' },
-            { field: 'add',      label: 'Add bookmark' },
-            { field: 'delete',   label: 'Delete selected' },
-            { field: 'edit',     label: 'Edit / rename' },
-            { field: 'settings', label: 'Open settings' },
+            { field: 'search',     label: 'Search' },
+            { field: 'add',        label: 'Add bookmark' },
+            { field: 'delete',     label: 'Delete selected' },
+            { field: 'edit',       label: 'Edit / rename' },
+            { field: 'settings',   label: 'Open settings' },
+            { field: 'yank',       label: 'Copy URL' },
+            { field: 'openNewTab', label: 'Open in new tab' },
           ] as row (row.field)}
             {@const config = getKeybind(row.field)}
             <div class="bp-kb-row">
