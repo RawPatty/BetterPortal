@@ -1,55 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Settings, HotkeyConfig } from '../shared/types';
+  import type { Settings } from '../shared/types';
   import { settingsStore } from '../features/settings/settings.store';
   import { DEFAULT_SETTINGS } from '../shared/types';
   import AboutModal from '../features/settings/AboutModal.svelte';
+  import KeybindsModal from '../features/settings/KeybindsModal.svelte';
 
   let settings: Settings = { ...DEFAULT_SETTINGS };
-  let isRecordingHotkey = false;
-  let hotkeyError = '';
   let saveMessage = '';
   let showAbout = false;
+  let showKeybinds = false;
 
   onMount(async () => {
     settings = await settingsStore.get();
   });
-
-  function startHotkeyRecording() {
-    isRecordingHotkey = true;
-    hotkeyError = '';
-  }
-
-  function handleHotkeyKeydown(event: KeyboardEvent) {
-    if (!isRecordingHotkey) return;
-
-    event.preventDefault();
-
-    if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
-      return;
-    }
-
-    // Normalize spacebar key to match detection logic
-    const normalizedKey = event.key === ' ' ? 'Space' : event.key;
-
-    const newHotkey: HotkeyConfig = {
-      key: normalizedKey,
-      ctrl: event.ctrlKey,
-      shift: event.shiftKey,
-      alt: event.altKey,
-      meta: event.metaKey,
-    };
-
-    settings.hotkey = newHotkey;
-    isRecordingHotkey = false;
-    hotkeyError = '';
-    saveSettings();
-  }
-
-  function cancelHotkeyRecording() {
-    isRecordingHotkey = false;
-    hotkeyError = '';
-  }
 
   async function saveSettings() {
     await settingsStore.update(settings);
@@ -82,7 +46,7 @@
   }
 </script>
 
-<div class="bp-settings-page bp-theme-{settings.theme || 'light'}">
+<div class="bp-settings-page bp-theme-{settings.theme || 'dark'}">
   <div class="bp-settings-panel">
     <header class="bp-settings-header">
       <h2>BetterPortal Settings</h2>
@@ -92,35 +56,6 @@
     </header>
 
     <div class="bp-settings-content">
-      <!-- Hotkey Section -->
-      <section class="bp-settings-section">
-        <h3>Keyboard Shortcut</h3>
-        <div class="bp-settings-row">
-          <span class="bp-label">Open Overlay</span>
-          <div class="bp-hotkey-input">
-            {#if isRecordingHotkey}
-              <!-- svelte-ignore a11y-autofocus -->
-              <input
-                type="text"
-                class="bp-hotkey-recorder"
-                placeholder="Press new shortcut..."
-                on:keydown={handleHotkeyKeydown}
-                on:blur={cancelHotkeyRecording}
-                autofocus
-                readonly
-              />
-              <button class="bp-btn-small" on:click={cancelHotkeyRecording}>Cancel</button>
-            {:else}
-              <kbd class="bp-hotkey-display">{formatHotkey(settings.hotkey)}</kbd>
-              <button class="bp-btn-small" on:click={startHotkeyRecording}>Change</button>
-            {/if}
-          </div>
-          {#if hotkeyError}
-            <div class="bp-error">{hotkeyError}</div>
-          {/if}
-        </div>
-      </section>
-
       <!-- Display Section -->
       <section class="bp-settings-section">
         <h3>Display</h3>
@@ -137,12 +72,6 @@
             <option value="full">Full (include blade)</option>
             <option value="resource">Resource only</option>
           </select>
-        </div>
-        <div class="bp-settings-row">
-          <label>
-            <input type="checkbox" bind:checked={settings.showStaleIndicator} on:change={saveSettings} />
-            Show stale resource indicator
-          </label>
         </div>
       </section>
 
@@ -184,6 +113,7 @@
     <footer class="bp-settings-footer">
       <div class="bp-settings-footer-left">
         <button class="bp-btn bp-btn--secondary" on:click={() => showAbout = true}>About</button>
+        <button class="bp-btn bp-btn--secondary" on:click={() => showKeybinds = true}>Keybinds</button>
       </div>
       <div class="bp-settings-footer-right">
         <button class="bp-btn bp-btn--secondary" on:click={resetSettings}>Reset to Defaults</button>
@@ -193,6 +123,7 @@
 </div>
 
 <AboutModal isOpen={showAbout} on:close={() => showAbout = false} />
+<KeybindsModal isOpen={showKeybinds} on:close={() => showKeybinds = false} on:settingsChanged={saveSettings} />
 
 <style>
   @import '../shared/theme.css';
@@ -288,34 +219,6 @@
     height: 16px;
   }
 
-  .bp-hotkey-input {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .bp-hotkey-display {
-    display: inline-block;
-    padding: 6px 12px;
-    font-family: monospace;
-    font-size: 13px;
-    background: var(--bp-bg-secondary, #f5f5f5);
-    border: 1px solid var(--bp-border, #e1e1e1);
-    border-radius: 4px;
-    color: var(--bp-text, #323130);
-  }
-
-  .bp-hotkey-recorder {
-    padding: 6px 12px;
-    font-size: 14px;
-    border: 2px solid var(--bp-accent, #0078d4);
-    border-radius: 4px;
-    outline: none;
-    width: 180px;
-    background: var(--bp-bg, #fff);
-    color: var(--bp-text, #323130);
-  }
-
   .bp-btn-small {
     padding: 4px 10px;
     font-size: 12px;
@@ -328,12 +231,6 @@
 
   .bp-btn-small:hover {
     background: var(--bp-border, #e1e1e1);
-  }
-
-  .bp-error {
-    color: var(--bp-error, #d13438);
-    font-size: 12px;
-    margin-top: 4px;
   }
 
   .bp-settings-footer {
