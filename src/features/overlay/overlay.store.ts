@@ -343,7 +343,6 @@ export const overlayActions = {
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       accessCount: 0,
-      isStale: false,
     };
 
     const result = await bookmarkStore.save(bookmark);

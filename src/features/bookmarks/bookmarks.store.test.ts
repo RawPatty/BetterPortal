@@ -235,7 +235,6 @@ describe('bookmarkStore', () => {
           createdAt: Date.now() - 10000,
           lastAccessed: Date.now() - 10000,
           accessCount: 0,
-          isStale: false,
           url: 'https://portal.azure.com/#@contoso.onmicrosoft.com/resource/sub/old-1',
         },
         {
@@ -249,7 +248,6 @@ describe('bookmarkStore', () => {
           createdAt: Date.now() - 10000,
           lastAccessed: Date.now() - 10000,
           accessCount: 0,
-          isStale: false,
           url: 'https://portal.azure.com/#@fabrikam.onmicrosoft.com/resource/sub/old-2',
         },
       ];
@@ -291,7 +289,6 @@ describe('bookmarkStore', () => {
           createdAt: Date.now() - 10000,
           lastAccessed: Date.now() - 10000,
           accessCount: 0,
-          isStale: false,
           url: originalUrl,
         },
       ];
@@ -332,7 +329,6 @@ describe('bookmarkStore', () => {
         createdAt: Date.now(),
         lastAccessed: Date.now(),
         accessCount: 0,
-        isStale: false,
       }];
 
       // Trigger learnTenantMapping by saving a bookmark on a page with GUID in URL
@@ -420,7 +416,6 @@ describe('bookmark limit', () => {
       createdAt: 0,
       lastAccessed: 0,
       accessCount: 0,
-      isStale: false,
     }));
     mockStorage['bookmarks'] = existing;
 
@@ -436,7 +431,6 @@ describe('bookmark limit', () => {
       createdAt: 0,
       lastAccessed: 0,
       accessCount: 0,
-      isStale: false,
     });
 
     expect(result).toEqual({ success: false, reason: 'limit_reached' });
@@ -457,7 +451,6 @@ describe('bookmark limit', () => {
       createdAt: 0,
       lastAccessed: 0,
       accessCount: 0,
-      isStale: false,
     }));
     mockStorage['bookmarks'] = existing;
 
@@ -482,7 +475,6 @@ describe('bookmark limit', () => {
       createdAt: 0,
       lastAccessed: 0,
       accessCount: 0,
-      isStale: false,
     };
 
     const result = await bookmarkStore.save(newBookmark);
@@ -501,7 +493,6 @@ function makeBookmark(id: string) {
     displayName: id,
     alias: null,
     stateDepth: 'full' as const,
-    createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
   };
 }
 
@@ -566,7 +557,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Web/sites/app',
       displayName: 'app', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     await migrateBookmarks();
@@ -587,7 +577,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'fabrikam.onmicrosoft.com',
       resourceId: '/subscriptions/sub-2/resourceGroups/rg/providers/Microsoft.Web/sites/app',
       displayName: 'app', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     await migrateBookmarks();
@@ -608,7 +597,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-3',
       displayName: 'sub', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     await migrateBookmarks();
@@ -629,7 +617,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-3',
       displayName: 'sub', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     await migrateBookmarks();
@@ -648,7 +635,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'unknown.onmicrosoft.com',
       resourceId: '/subscriptions/sub-4',
       displayName: 'sub', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     await migrateBookmarks();
@@ -669,7 +655,6 @@ describe('migrateBookmarks', () => {
       tenantName: 'contoso.onmicrosoft.com',
       resourceId: '/subscriptions/sub-6',
       displayName: 'sub', alias: null, stateDepth: 'resource' as const,
-      createdAt: 1000, lastAccessed: 1000, accessCount: 0, isStale: false,
     }];
 
     const { storageSet } = await import('../../shared/storage');

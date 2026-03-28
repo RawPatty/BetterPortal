@@ -107,7 +107,6 @@ describe('overlayActions', () => {
         displayName: historyEntry.displayName,
         alias: null,
         stateDepth: 'full',
-        isStale: false,
       });
 
       // Verify it has required bookmark fields
@@ -180,7 +179,6 @@ describe('overlayActions', () => {
         createdAt: Date.now(),
         lastAccessed: Date.now(),
         accessCount: 0,
-        isStale: false,
       }];
 
       await overlayActions.renameBookmark('bm-1', 'My Custom Name');
@@ -202,7 +200,6 @@ describe('overlayActions', () => {
         createdAt: Date.now(),
         lastAccessed: Date.now(),
         accessCount: 0,
-        isStale: false,
       }];
 
       await overlayActions.renameBookmark('bm-1', null);
@@ -262,7 +259,6 @@ describe('overlayActions', () => {
         createdAt: Date.now(),
         lastAccessed: Date.now(),
         accessCount: 0,
-        isStale: false,
       }]);
 
       // Set tenant alias
@@ -294,7 +290,6 @@ describe('overlayActions', () => {
         createdAt: Date.now(),
         lastAccessed: Date.now(),
         accessCount: 0,
-        isStale: false,
       }]);
 
       tenantAliases.set({});
@@ -327,7 +322,6 @@ function makeBookmark(id: string, tenantName: string, tenantId: string | null, r
     createdAt: 0,
     lastAccessed: 0,
     accessCount: 0,
-    isStale: false,
   };
 }
 
@@ -350,7 +344,6 @@ describe('overlayError on limit_reached', () => {
       displayName: `rg-${i}`,
       alias: null,
       stateDepth: 'full' as const,
-      createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
     }));
 
     await overlayActions.saveCurrentPage();
@@ -378,7 +371,6 @@ describe('overlayError on limit_reached', () => {
       displayName: `rg-${i}`,
       alias: null,
       stateDepth: 'full' as const,
-      createdAt: 0, lastAccessed: 0, accessCount: 0, isStale: false,
     }));
 
     const historyEntry = {

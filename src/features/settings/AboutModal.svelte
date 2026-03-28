@@ -35,7 +35,7 @@
 {#if isOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="bp-about-modal bp-theme-{settings.theme || 'light'}" on:click={handleBackdropClick}>
+  <div class="bp-about-modal bp-theme-{settings.theme || 'dark'}" on:click={handleBackdropClick}>
     <div class="bp-about-panel" role="dialog" aria-modal="true" aria-label="About">
       <header class="bp-about-header">
         <h2>About BetterPortal</h2>

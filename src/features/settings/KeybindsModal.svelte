@@ -9,6 +9,14 @@
   const dispatch = createEventDispatcher();
   let settings: Settings = { ...DEFAULT_SETTINGS };
   let recordingField: string | null = null;
+  let conflictMessage = '';
+  let conflictTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function showConflict(msg: string) {
+    conflictMessage = msg;
+    if (conflictTimer) clearTimeout(conflictTimer);
+    conflictTimer = setTimeout(() => { conflictMessage = ''; }, 4000);
+  }
 
   onMount(async () => {
     settings = await settingsStore.get();
@@ -32,7 +40,9 @@
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const parts: string[] = [];
     if (config.ctrl) parts.push('Ctrl');
-    if (config.shift) parts.push('Shift');
+    // For single-character keys the character itself encodes shift (e.g. '?' implies Shift on US
+    // keyboards, 'A' implies Shift). Only show 'Shift' for named keys like Space, F1, Enter, etc.
+    if (config.shift && config.key.length !== 1) parts.push('Shift');
     if (config.alt) parts.push('Alt');
     if (config.meta) parts.push(isMac ? '⌘' : 'Meta');
     parts.push(config.key);
@@ -87,6 +97,16 @@
   const OVERLAY_FIELDS = ['navDown', 'navUp', 'search', 'add', 'delete', 'edit', 'settings'] as const;
   type OverlayField = typeof OVERLAY_FIELDS[number];
 
+  const FIELD_LABELS: Record<string, string> = {
+    navDown:  'Navigate down',
+    navUp:    'Navigate up',
+    search:   'Search',
+    add:      'Add bookmark',
+    delete:   'Delete selected',
+    edit:     'Edit / rename',
+    settings: 'Open settings',
+  };
+
   function getKeybind(field: string): HotkeyConfig | null {
     return settings.overlayKeybinds[field as OverlayField];
   }
@@ -95,18 +115,30 @@
     const updatedKeybinds = { ...settings.overlayKeybinds };
 
     // Clear any other overlay keybind that conflicts with the new value
+    const displaced: string[] = [];
     for (const field of OVERLAY_FIELDS) {
       if (field === targetField) continue;
       const existing = updatedKeybinds[field];
       if (existing && hotkeysEqual(existing, newConfig)) {
         updatedKeybinds[field] = null;
+        displaced.push(FIELD_LABELS[field] ?? field);
       }
+    }
+    if (displaced.length > 0) {
+      showConflict(`"${formatHotkey(newConfig)}" was unassigned from ${displaced.join(', ')} due to a conflict.`);
     }
 
     if (targetField === 'hotkey') {
+      // Changing global hotkey: clear any overlay keybind that now conflicts
       settings = { ...settings, hotkey: newConfig, overlayKeybinds: updatedKeybinds };
     } else {
-      updatedKeybinds[targetField as OverlayField] = newConfig;
+      // Changing an overlay keybind: if it conflicts with the global hotkey, leave it unassigned
+      if (hotkeysEqual(newConfig, settings.hotkey)) {
+        updatedKeybinds[targetField as OverlayField] = null;
+        showConflict(`"${formatHotkey(newConfig)}" is already used by Open / close overlay — change that hotkey first.`);
+      } else {
+        updatedKeybinds[targetField as OverlayField] = newConfig;
+      }
       settings = { ...settings, overlayKeybinds: updatedKeybinds };
     }
 
@@ -279,6 +311,10 @@
         </section>
 
       </div>
+
+      {#if conflictMessage}
+        <div class="bp-conflict-msg" role="alert">{conflictMessage}</div>
+      {/if}
 
       <footer class="bp-keybinds-footer">
         <button class="bp-btn bp-btn--secondary" on:click={resetKeybinds}>Reset to Defaults</button>
@@ -458,6 +494,14 @@
 
   .bp-btn-small:hover {
     background: var(--bp-border, #e1e1e1);
+  }
+
+  .bp-conflict-msg {
+    padding: 8px 20px;
+    font-size: 12px;
+    color: var(--bp-warning, #f0ad4e);
+    border-top: 1px solid var(--bp-border, #e1e1e1);
+    background: var(--bp-bg-secondary, #f8f8f8);
   }
 
   .bp-keybinds-footer {

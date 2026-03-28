@@ -27,15 +27,8 @@
     }, 2000);
   }
 
-  function formatHotkey(hotkey: HotkeyConfig): string {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const parts: string[] = [];
-    if (hotkey.ctrl) parts.push('Ctrl');
-    if (hotkey.shift) parts.push('Shift');
-    if (hotkey.alt) parts.push('Alt');
-    if (hotkey.meta) parts.push(isMac ? '⌘' : 'Meta');
-    parts.push(hotkey.key);
-    return parts.join('+');
+  async function handleKeybindsChanged() {
+    settings = await settingsStore.get();
   }
 
   async function resetSettings() {
@@ -100,8 +93,8 @@
           <input
             id="maxEntries"
             type="number"
-            min="10"
-            max="1000"
+            min="1"
+            max="5000"
             bind:value={settings.historyMaxEntries}
             on:change={saveSettings}
           />
@@ -123,7 +116,7 @@
 </div>
 
 <AboutModal isOpen={showAbout} on:close={() => showAbout = false} />
-<KeybindsModal isOpen={showKeybinds} on:close={() => showKeybinds = false} on:settingsChanged={saveSettings} />
+<KeybindsModal isOpen={showKeybinds} on:close={() => showKeybinds = false} on:settingsChanged={handleKeybindsChanged} />
 
 <style>
   @import '../shared/theme.css';
@@ -217,20 +210,6 @@
   .bp-settings-row input[type="checkbox"] {
     width: 16px;
     height: 16px;
-  }
-
-  .bp-btn-small {
-    padding: 4px 10px;
-    font-size: 12px;
-    background: var(--bp-bg-secondary, #f5f5f5);
-    border: 1px solid var(--bp-border, #e1e1e1);
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--bp-text, #323130);
-  }
-
-  .bp-btn-small:hover {
-    background: var(--bp-border, #e1e1e1);
   }
 
   .bp-settings-footer {

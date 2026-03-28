@@ -402,7 +402,6 @@ export const bookmarkStore = {
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       accessCount: 0,
-      isStale: false,
     };
 
     // Check for existing bookmark with same resource+tenant (use tenantName for grouping consistency)
@@ -506,13 +505,6 @@ export const bookmarkStore = {
     });
 
     await navigateToItem(bookmark.url, bookmark.tenantId, bookmark.tenantName);
-  },
-
-  /**
-   * Mark a bookmark as stale
-   */
-  async markStale(id: string, isStale: boolean): Promise<void> {
-    await this.update(id, { isStale });
   },
 
   /**

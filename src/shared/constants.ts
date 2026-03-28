@@ -42,7 +42,6 @@ export const OVERLAY_CLASSES = {
   LIST: 'bp-overlay__list',
   ITEM: 'bp-overlay__item',
   ITEM_SELECTED: 'bp-overlay__item--selected',
-  ITEM_STALE: 'bp-overlay__item--stale',
   GROUP: 'bp-overlay__group',
   GROUP_HEADER: 'bp-overlay__group-header',
   ACTIONS: 'bp-overlay__actions',

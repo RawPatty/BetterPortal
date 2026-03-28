@@ -60,7 +60,6 @@ function makeBookmark(id: string): Bookmark {
     createdAt: 0,
     lastAccessed: 0,
     accessCount: 0,
-    isStale: false,
   };
 }
 

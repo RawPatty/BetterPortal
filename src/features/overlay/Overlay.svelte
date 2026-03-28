@@ -19,6 +19,16 @@
   import SettingsPanel from '../settings/SettingsPanel.svelte';
   import { buildCopyUrl } from '../bookmarks/url-parser';
 
+  function formatHotkey(config: HotkeyConfig): string {
+    const parts: string[] = [];
+    if (config.ctrl) parts.push('Ctrl');
+    if (config.shift && config.key.length !== 1) parts.push('Shift');
+    if (config.alt) parts.push('Alt');
+    if (config.meta) parts.push('Meta');
+    parts.push(config.key);
+    return parts.join('+');
+  }
+
   function matchesHotkey(event: KeyboardEvent, config: HotkeyConfig): boolean {
     const pressedKey = event.key === ' ' ? 'Space' : event.key;
     return (
@@ -61,6 +71,7 @@
   // Track flat index for vim navigation
   $: flatItems = $filteredItems;
   $: currentItem = flatItems[$selectedIndex];
+  $: kb = $settings?.overlayKeybinds;
 
   onMount(() => {
     // Listen for toggle event from content script
@@ -490,13 +501,15 @@
 
       <footer class="bp-footer">
         <div class="bp-shortcuts">
-          <span><kbd>↑</kbd><kbd>↓</kbd> or <kbd>j</kbd><kbd>k</kbd> navigate</span>
+          <span>
+            <kbd>↑</kbd><kbd>↓</kbd>{#if kb?.navDown || kb?.navUp} or {#if kb?.navDown}<kbd>{formatHotkey(kb.navDown)}</kbd>{/if}{#if kb?.navUp}<kbd>{formatHotkey(kb.navUp)}</kbd>{/if}{/if} navigate
+          </span>
           <span><kbd>Enter</kbd> open</span>
-          <span><kbd>/</kbd> search</span>
-          <span><kbd>a</kbd> add</span>
-          <span><kbd>e</kbd> rename</span>
-          <span><kbd>d</kbd> delete</span>
-          <span><kbd>?</kbd> settings</span>
+          {#if kb?.search}<span><kbd>{formatHotkey(kb.search)}</kbd> search</span>{/if}
+          {#if kb?.add}<span><kbd>{formatHotkey(kb.add)}</kbd> add</span>{/if}
+          {#if kb?.edit}<span><kbd>{formatHotkey(kb.edit)}</kbd> rename</span>{/if}
+          {#if kb?.delete}<span><kbd>{formatHotkey(kb.delete)}</kbd> delete</span>{/if}
+          {#if kb?.settings}<span><kbd>{formatHotkey(kb.settings)}</kbd> settings</span>{/if}
           <span><kbd>Esc</kbd> close</span>
         </div>
       </footer>
