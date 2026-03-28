@@ -60,6 +60,21 @@
     setTimeout(() => { copiedItemId = null; }, 1500);
   }
 
+  async function copyCurrentItemUrl() {
+    if (!currentItem) return;
+    const url = buildCopyUrl(currentItem);
+    await navigator.clipboard.writeText(url);
+    copiedItemId = currentItem.id;
+    setTimeout(() => { copiedItemId = null; }, 1500);
+  }
+
+  function openCurrentInNewTab() {
+    if (!currentItem) return;
+    const url = buildCopyUrl(currentItem);
+    overlayActions.close();
+    window.open(url, '_blank');
+  }
+
   async function copyTenantGuid(tenantKey: string, guid: string, event: MouseEvent) {
     event.stopPropagation();
     await navigator.clipboard.writeText(guid);
@@ -286,6 +301,12 @@
     } else if (kb.settings && matchesHotkey(event, kb.settings)) {
       event.preventDefault();
       showSettings = true;
+    } else if (kb.yank && matchesHotkey(event, kb.yank)) {
+      event.preventDefault();
+      copyCurrentItemUrl();
+    } else if (kb.openNewTab && matchesHotkey(event, kb.openNewTab)) {
+      event.preventDefault();
+      openCurrentInNewTab();
     }
   }
 
@@ -554,6 +575,9 @@
           {#if kb?.edit}<span><kbd>{formatHotkey(kb.edit)}</kbd> rename</span>{/if}
           {#if kb?.delete}<span><kbd>{formatHotkey(kb.delete)}</kbd> delete</span>{/if}
           {#if kb?.settings}<span><kbd>{formatHotkey(kb.settings)}</kbd> settings</span>{/if}
+          {#if kb?.yank}<span><kbd>{formatHotkey(kb.yank)}</kbd> copy</span>{/if}
+          {#if kb?.openNewTab}<span><kbd>{formatHotkey(kb.openNewTab)}</kbd> new tab</span>{/if}
+          <span><kbd>gg</kbd> first · <kbd>G</kbd> last · <kbd>Ctrl+D/U</kbd> page</span>
           <span><kbd>Esc</kbd> close</span>
         </div>
       </footer>
