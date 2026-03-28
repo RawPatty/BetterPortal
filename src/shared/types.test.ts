@@ -13,5 +13,7 @@ describe('DEFAULT_SETTINGS.overlayKeybinds', () => {
     expect(kb.settings).toEqual({ key: '?', ctrl: false, shift: true, alt: false, meta: false });
     expect(kb.yank).toEqual({ key: 'y', ctrl: false, shift: false, alt: false, meta: false });
     expect(kb.openNewTab).toEqual({ key: 't', ctrl: false, shift: false, alt: false, meta: false });
+    expect(kb.halfPageDown).toEqual({ key: 'd', ctrl: true, shift: false, alt: false, meta: false });
+    expect(kb.halfPageUp).toEqual({ key: 'u', ctrl: true, shift: false, alt: false, meta: false });
   });
 });

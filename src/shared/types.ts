@@ -51,6 +51,8 @@ export interface OverlayKeybinds {
   settings: HotkeyConfig | null;
   yank: HotkeyConfig | null;
   openNewTab: HotkeyConfig | null;
+  halfPageDown: HotkeyConfig | null;
+  halfPageUp: HotkeyConfig | null;
 }
 
 export interface Settings {
@@ -80,8 +82,10 @@ export const DEFAULT_SETTINGS: Settings = {
     delete:   { key: 'd', ctrl: false, shift: false, alt: false, meta: false },
     edit:     { key: 'e', ctrl: false, shift: false, alt: false, meta: false },
     settings: { key: '?', ctrl: false, shift: true, alt: false, meta: false },
-    yank:       { key: 'y', ctrl: false, shift: false, alt: false, meta: false },
-    openNewTab: { key: 't', ctrl: false, shift: false, alt: false, meta: false },
+    yank:         { key: 'y', ctrl: false, shift: false, alt: false, meta: false },
+    openNewTab:   { key: 't', ctrl: false, shift: false, alt: false, meta: false },
+    halfPageDown: { key: 'd', ctrl: true,  shift: false, alt: false, meta: false },
+    halfPageUp:   { key: 'u', ctrl: true,  shift: false, alt: false, meta: false },
   },
   lastExportedAt: null,
   bookmarkSyncEnabled: false,

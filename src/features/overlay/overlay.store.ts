@@ -98,7 +98,6 @@ export const filteredItems = derived(
           'alias' in item ? item.alias : null,
           item.tenantName,
           tenantAlias,
-          item.resourceId,
         ]
           .filter(Boolean)
           .join(' ')

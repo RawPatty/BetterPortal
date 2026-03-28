@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BetterPortal Overlay Mockups</title>
+<style>
+  /* Page layout */
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #111;
+    color: #ccc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 60px;
+    padding: 40px 20px;
+  }
+
+  h1 { color: #fff; font-size: 24px; margin-bottom: 0; }
+  .mockup-label { color: #888; font-size: 14px; margin-bottom: 8px; text-align: center; }
+
+  /* ──────────── Theme variables (dark) ──────────── */
+  .bp-theme-dark {
+    --bp-bg: #1e1e1e;
+    --bp-bg-secondary: #2d2d2d;
+    --bp-bg-tertiary: rgba(79, 195, 247, 0.1);
+    --bp-text: #e8e8e8;
+    --bp-text-secondary: #b8b8b8;
+    --bp-border: #3d3d3d;
+    --bp-accent: #4fc3f7;
+    --bp-accent-hover: #29b6f6;
+    --bp-error: #f44336;
+    --bp-success: #4caf50;
+    --bp-warning: #ff9800;
+  }
+
+  /* ──────────── Overlay styles (copied from Overlay.svelte) ──────────── */
+  .bp-panel {
+    width: 600px;
+    max-width: 90vw;
+    background: var(--bp-bg, #ffffff);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .bp-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--bp-border, #e1e1e1);
+  }
+
+  .bp-title {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bp-text-secondary, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .bp-search-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bp-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 36px 10px 12px;
+    font-size: 14px;
+    border: 2px solid var(--bp-border, #e1e1e1);
+    border-radius: 4px;
+    background: var(--bp-bg-secondary, #f5f5f5);
+    color: var(--bp-text, #323130);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .bp-search-hint {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--bp-text-secondary, #666);
+    background: var(--bp-bg, #fff);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--bp-border, #e1e1e1);
+  }
+
+  .bp-current-dir {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--bp-bg-secondary, #f5f5f5);
+    border: 1px solid var(--bp-border, #e1e1e1);
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+    overflow: hidden;
+  }
+
+  .bp-current-dir-label { font-weight: 600; flex-shrink: 0; }
+  .bp-current-dir-domain { color: var(--bp-text, #323130); font-weight: 500; flex-shrink: 0; }
+  .bp-current-dir-formal { font-size: 10px; color: var(--bp-text-secondary, #666); flex-shrink: 0; }
+
+  .bp-list {
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .bp-group {
+    margin-bottom: 0;
+    border-top: 2px solid var(--bp-border, #e1e1e1);
+    padding-top: 4px;
+  }
+
+  .bp-group--first {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .bp-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bp-text, #323130);
+    background: var(--bp-bg-tertiary, rgba(0, 120, 212, 0.06));
+    border-bottom: 1px solid var(--bp-border, #e1e1e1);
+    margin-bottom: 4px;
+  }
+
+  .bp-group-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bp-directory-icon {
+    color: var(--bp-accent, #0078d4);
+    flex-shrink: 0;
+  }
+
+  .bp-tenant-name { font-weight: 600; }
+
+  .bp-group-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bp-tenant-count {
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+    font-weight: 400;
+  }
+
+  .bp-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+
+  .bp-item--selected {
+    background: var(--bp-accent, #0078d4);
+    color: white;
+  }
+
+  .bp-item--selected .bp-item-icon { color: white; }
+  .bp-item--selected .bp-item-name { color: white; }
+
+  .bp-item--history .bp-item-icon {
+    color: var(--bp-text-secondary, #666);
+  }
+
+  .bp-item-icon {
+    flex-shrink: 0;
+    color: var(--bp-accent, #0078d4);
+    display: flex;
+    align-items: center;
+  }
+
+  .bp-item-name {
+    flex: 1;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--bp-text, #323130);
+  }
+
+  .bp-copy-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--bp-text-secondary, #666);
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .bp-item:hover .bp-copy-btn,
+  .bp-group-header:hover .bp-copy-btn { opacity: 1; }
+  .bp-item--selected .bp-copy-btn { color: rgba(255,255,255,0.7); opacity: 1; }
+
+  .bp-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--bp-border, #e1e1e1);
+    background: var(--bp-bg-secondary, #f5f5f5);
+  }
+
+  .bp-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--bp-text-secondary, #666);
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 2px 5px;
+    font-family: monospace;
+    font-size: 10px;
+    background: var(--bp-bg, #fff);
+    border: 1px solid var(--bp-border, #e1e1e1);
+    border-radius: 3px;
+    margin-right: 2px;
+  }
+
+  /* SVG icons inline */
+  .icon-bookmark, .icon-history, .icon-folder, .icon-copy { display: inline-flex; align-items: center; }
+</style>
+</head>
+<body>
+
+<h1>BetterPortal — Store Screenshots</h1>
+<p style="color:#666; margin-top:4px;">Open in browser, screenshot each panel individually</p>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- MOCKUP 1: Mixed bookmarks & history (single directory) -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+
+<div>
+  <div class="mockup-label">Mockup 1 — Bookmarks + History mix</div>
+  <div class="bp-theme-dark">
+    <div class="bp-panel">
+      <header class="bp-header">
+        <h2 class="bp-title">BetterPortal</h2>
+        <div class="bp-search-container">
+          <input type="text" class="bp-search" placeholder="Search bookmarks... (press / to focus)" readonly>
+          <span class="bp-search-hint">/</span>
+        </div>
+        <div class="bp-current-dir">
+          <span class="bp-current-dir-label">Current directory:</span>
+          <span class="bp-current-dir-domain">Contoso Production</span>
+          <span class="bp-current-dir-formal">(contoso.onmicrosoft.com)</span>
+        </div>
+      </header>
+
+      <div class="bp-list">
+        <!-- Group: contoso.onmicrosoft.com -->
+        <div class="bp-group bp-group--first">
+          <div class="bp-group-header">
+            <div class="bp-group-header-left">
+              <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span class="bp-tenant-name">Contoso Production</span>
+            </div>
+            <div class="bp-group-header-right">
+              <span class="bp-tenant-count">8 items</span>
+            </div>
+          </div>
+
+          <!-- Bookmarks (always on top) -->
+          <div class="bp-item bp-item--selected">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">app-frontend-prod | App Service</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">sql-prod-westus | SQL Database</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">kv-contoso-prod | Key Vault</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">aks-prod-cluster | Kubernetes Service</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">func-order-processor | Function App</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <!-- History (always below bookmarks) -->
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">rg-networking | Resource Group</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">cosmos-analytics | Cosmos DB Account</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">vnet-hub-prod | Virtual Network</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="bp-footer">
+        <div class="bp-shortcuts">
+          <span><kbd>↑</kbd><kbd>↓</kbd> or <kbd>k</kbd><kbd>j</kbd> navigate</span>
+          <span><kbd>gg</kbd> first · <kbd>G</kbd> last</span>
+          <span><kbd>Ctrl+u</kbd> <kbd>Ctrl+d</kbd> jump 5</span>
+          <span><kbd>Enter</kbd> open</span>
+          <span><kbd>t</kbd> new tab</span>
+          <span><kbd>/</kbd> search</span>
+          <span><kbd>a</kbd> add</span>
+          <span><kbd>e</kbd> rename</span>
+          <span><kbd>d</kbd> delete</span>
+          <span><kbd>y</kbd> copy</span>
+          <span><kbd>?</kbd> settings</span>
+          <span><kbd>Esc</kbd> close</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- MOCKUP 2: Multi-directory -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+
+<div>
+  <div class="mockup-label">Mockup 2 — Multi-directory with aliases</div>
+  <div class="bp-theme-dark">
+    <div class="bp-panel">
+      <header class="bp-header">
+        <h2 class="bp-title">BetterPortal</h2>
+        <div class="bp-search-container">
+          <input type="text" class="bp-search" placeholder="Search bookmarks... (press / to focus)" readonly>
+          <span class="bp-search-hint">/</span>
+        </div>
+        <div class="bp-current-dir">
+          <span class="bp-current-dir-label">Current directory:</span>
+          <span class="bp-current-dir-domain">Contoso Production</span>
+          <span class="bp-current-dir-formal">(contoso.onmicrosoft.com)</span>
+        </div>
+      </header>
+
+      <div class="bp-list">
+
+        <!-- Group 1: Contoso Production -->
+        <div class="bp-group bp-group--first">
+          <div class="bp-group-header">
+            <div class="bp-group-header-left">
+              <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span class="bp-tenant-name">Contoso Production</span>
+            </div>
+            <div class="bp-group-header-right">
+              <span class="bp-tenant-count">4 items</span>
+            </div>
+          </div>
+
+          <div class="bp-item bp-item--selected">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">app-frontend-prod | App Service</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">sql-prod-westus | SQL Database</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">kv-contoso-prod | Key Vault</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">aks-prod-cluster | Kubernetes Service</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group 2: Fabrikam Dev/Test -->
+        <div class="bp-group">
+          <div class="bp-group-header">
+            <div class="bp-group-header-left">
+              <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span class="bp-tenant-name">Fabrikam Dev/Test</span>
+            </div>
+            <div class="bp-group-header-right">
+              <span class="bp-tenant-count">3 items</span>
+            </div>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">app-api-staging | App Service</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">cosmos-dev-analytics | Cosmos DB Account</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">rg-dev-experiments | Resource Group</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group 3: Northwind Traders -->
+        <div class="bp-group">
+          <div class="bp-group-header">
+            <div class="bp-group-header-left">
+              <svg class="bp-directory-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span class="bp-tenant-name">Northwind Traders</span>
+            </div>
+            <div class="bp-group-header-right">
+              <span class="bp-tenant-count">2 items</span>
+            </div>
+          </div>
+
+          <div class="bp-item">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <span class="bp-item-name">func-inventory-sync | Function App</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+
+          <div class="bp-item bp-item--history">
+            <span class="bp-item-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            </span>
+            <span class="bp-item-name">st-northwind-exports | Storage Account</span>
+            <button class="bp-copy-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <footer class="bp-footer">
+        <div class="bp-shortcuts">
+          <span><kbd>↑</kbd><kbd>↓</kbd> or <kbd>k</kbd><kbd>j</kbd> navigate</span>
+          <span><kbd>gg</kbd> first · <kbd>G</kbd> last</span>
+          <span><kbd>Ctrl+u</kbd> <kbd>Ctrl+d</kbd> jump 5</span>
+          <span><kbd>Enter</kbd> open</span>
+          <span><kbd>t</kbd> new tab</span>
+          <span><kbd>/</kbd> search</span>
+          <span><kbd>a</kbd> add</span>
+          <span><kbd>e</kbd> rename</span>
+          <span><kbd>d</kbd> delete</span>
+          <span><kbd>y</kbd> copy</span>
+          <span><kbd>?</kbd> settings</span>
+          <span><kbd>Esc</kbd> close</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

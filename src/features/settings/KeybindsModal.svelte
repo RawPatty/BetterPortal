@@ -94,7 +94,7 @@
     );
   }
 
-  const OVERLAY_FIELDS = ['navDown', 'navUp', 'search', 'add', 'delete', 'edit', 'settings', 'yank', 'openNewTab'] as const;
+  const OVERLAY_FIELDS = ['navDown', 'navUp', 'search', 'add', 'delete', 'edit', 'settings', 'yank', 'openNewTab', 'halfPageDown', 'halfPageUp'] as const;
   type OverlayField = typeof OVERLAY_FIELDS[number];
 
   const FIELD_LABELS: Record<string, string> = {
@@ -105,13 +105,11 @@
     delete:     'Delete selected',
     edit:       'Edit / rename',
     settings:   'Open settings',
-    yank:       'Copy URL',
-    openNewTab: 'Open in new tab',
+    yank:         'Copy URL',
+    openNewTab:   'Open in new tab',
+    halfPageDown: 'Half-page down',
+    halfPageUp:   'Half-page up',
   };
-
-  function getKeybind(field: string): HotkeyConfig | null {
-    return settings.overlayKeybinds[field as OverlayField];
-  }
 
   function applyNewKeybind(targetField: string, newConfig: HotkeyConfig) {
     const updatedKeybinds = { ...settings.overlayKeybinds };
@@ -283,10 +281,12 @@
             { field: 'delete',     label: 'Delete selected' },
             { field: 'edit',       label: 'Edit / rename' },
             { field: 'settings',   label: 'Open settings' },
-            { field: 'yank',       label: 'Copy URL' },
-            { field: 'openNewTab', label: 'Open in new tab' },
+            { field: 'yank',         label: 'Copy URL' },
+            { field: 'openNewTab',   label: 'Open in new tab' },
+            { field: 'halfPageDown', label: 'Half-page down' },
+            { field: 'halfPageUp',   label: 'Half-page up' },
           ] as row (row.field)}
-            {@const config = getKeybind(row.field)}
+            {@const config = settings.overlayKeybinds[row.field]}
             <div class="bp-kb-row">
               <span class="bp-kb-label">{row.label}</span>
               <div class="bp-kb-control">

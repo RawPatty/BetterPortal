@@ -15,14 +15,14 @@ Fast Azure portal navigation with bookmarks, history, and cross-device sync.
 - **Bookmark Sync**: Optionally sync bookmarks across devices via your Chrome account (up to 150 bookmarks)
 - **History**: Auto-capture visited resources with copy-to-clipboard support
 - **Import/Export**: Backup and restore bookmarks as JSON
-- **Vim-style Navigation**: `j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U` for fast navigation; `y` to copy URL; `o` to open in new tab
+- **Vim-style Navigation**: `j`/`k`, `gg`/`G`, `Ctrl+d`/`Ctrl+u` for fast navigation; `y` to copy URL; `t` to open in new tab
 - **Multi-tenant Support**: Automatic directory switching when navigating
 - **Directory Aliases**: Rename tenant directories with friendly names
 - **Current Directory Display**: Overlay header shows which Azure directory you're in
 
-| Bookmarks | Settings |
+| Single Directory | Multi-Directory |
 |:-:|:-:|
-| ![Bookmarks](screenshots/BladesExample.png) | ![Settings](screenshots/SettingsExample.png) |
+| ![Single Directory](screenshots/Example_main_panel_single_tenant.png) | ![Multi-Directory](screenshots/Example_main_panel_multi_tenant.png) |
 
 ## Installation
 
@@ -69,13 +69,9 @@ npm test
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+Space` | Open / close overlay (default — remappable in Settings) |
 | `↑` / `↓` | Navigate up / down |
-| `j` / `k` | Navigate down / up (vim) |
 | `gg` | Jump to first item |
 | `G` | Jump to last item |
-| `Ctrl+D` | Jump down 5 items |
-| `Ctrl+U` | Jump up 5 items |
 | `Enter` | Open selected item |
 | `Esc` | Close overlay / exit search |
 
@@ -83,6 +79,9 @@ npm test
 
 | Default | Action |
 |---------|--------|
+| `Ctrl+Space` | Open / close overlay |
+| `j` / `k` | Navigate down / up (vim) |
+| `Ctrl+d` / `Ctrl+u` | Jump down / up 5 items |
 | `/` | Focus search |
 | `a` | Bookmark current page, or promote history item to bookmark |
 | `d` | Delete selected item |
@@ -146,7 +145,7 @@ Settings are accessible via:
 - Overlay settings (`?` key)
 
 Configurable options:
-- Hotkey customization
+- Keybind customization (all overlay shortcuts are remappable)
 - Theme (Light, Dark)
 - History enable/disable
 - History retention period
@@ -226,7 +225,7 @@ Contributions are welcome! Here's how you can help:
 - ✅ Current directory display in overlay header
 - ✅ Copy-to-clipboard for history items and directory headers
 - ✅ Configurable history limit and retention
-
+- ✅ Fully configurable keybinds (vim-style defaults)
 - ✅ Firefox support (Firefox 128+)
 
 ### Planned

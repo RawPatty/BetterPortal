@@ -252,21 +252,7 @@
       return;
     }
 
-    // Ctrl+D — half-page down (fixed, 5 items)
-    if (event.key === 'd' && event.ctrlKey && !event.shiftKey && !event.altKey) {
-      event.preventDefault();
-      selectedIndex.set(Math.min($selectedIndex + 5, flatItems.length - 1));
-      scrollToSelected();
-      return;
-    }
 
-    // Ctrl+U — half-page up (fixed, 5 items)
-    if (event.key === 'u' && event.ctrlKey && !event.shiftKey && !event.altKey) {
-      event.preventDefault();
-      selectedIndex.set(Math.max($selectedIndex - 5, 0));
-      scrollToSelected();
-      return;
-    }
 
     // Configurable overlay keybinds
     const kb = $settings?.overlayKeybinds;
@@ -307,6 +293,14 @@
     } else if (kb.openNewTab && matchesHotkey(event, kb.openNewTab)) {
       event.preventDefault();
       openCurrentInNewTab();
+    } else if (kb.halfPageDown && matchesHotkey(event, kb.halfPageDown)) {
+      event.preventDefault();
+      selectedIndex.set(Math.min($selectedIndex + 5, flatItems.length - 1));
+      scrollToSelected();
+    } else if (kb.halfPageUp && matchesHotkey(event, kb.halfPageUp)) {
+      event.preventDefault();
+      selectedIndex.set(Math.max($selectedIndex - 5, 0));
+      scrollToSelected();
     }
   }
 
@@ -566,18 +560,22 @@
 
       <footer class="bp-footer">
         <div class="bp-shortcuts">
+          <!-- Navigation -->
           <span>
-            <kbd>↑</kbd><kbd>↓</kbd>{#if kb?.navDown || kb?.navUp} or {#if kb?.navDown}<kbd>{formatHotkey(kb.navDown)}</kbd>{/if}{#if kb?.navUp}<kbd>{formatHotkey(kb.navUp)}</kbd>{/if}{/if} navigate
+            <kbd>↑</kbd><kbd>↓</kbd>{#if kb?.navUp || kb?.navDown} or {#if kb?.navUp}<kbd>{formatHotkey(kb.navUp)}</kbd>{/if}{#if kb?.navDown}<kbd>{formatHotkey(kb.navDown)}</kbd>{/if}{/if} navigate
           </span>
+          <span><kbd>gg</kbd> first · <kbd>G</kbd> last</span>
+          {#if kb?.halfPageUp || kb?.halfPageDown}<span>{#if kb?.halfPageUp}<kbd>{formatHotkey(kb.halfPageUp)}</kbd>{/if}{#if kb?.halfPageDown} <kbd>{formatHotkey(kb.halfPageDown)}</kbd>{/if} jump 5</span>{/if}
+          <!-- Open -->
           <span><kbd>Enter</kbd> open</span>
+          {#if kb?.openNewTab}<span><kbd>{formatHotkey(kb.openNewTab)}</kbd> new tab</span>{/if}
+          <!-- Actions -->
           {#if kb?.search}<span><kbd>{formatHotkey(kb.search)}</kbd> search</span>{/if}
           {#if kb?.add}<span><kbd>{formatHotkey(kb.add)}</kbd> add</span>{/if}
           {#if kb?.edit}<span><kbd>{formatHotkey(kb.edit)}</kbd> rename</span>{/if}
           {#if kb?.delete}<span><kbd>{formatHotkey(kb.delete)}</kbd> delete</span>{/if}
-          {#if kb?.settings}<span><kbd>{formatHotkey(kb.settings)}</kbd> settings</span>{/if}
           {#if kb?.yank}<span><kbd>{formatHotkey(kb.yank)}</kbd> copy</span>{/if}
-          {#if kb?.openNewTab}<span><kbd>{formatHotkey(kb.openNewTab)}</kbd> new tab</span>{/if}
-          <span><kbd>gg</kbd> first · <kbd>G</kbd> last · <kbd>Ctrl+D/U</kbd> page</span>
+          {#if kb?.settings}<span><kbd>{formatHotkey(kb.settings)}</kbd> settings</span>{/if}
           <span><kbd>Esc</kbd> close</span>
         </div>
       </footer>
@@ -875,9 +873,14 @@
 
   .bp-shortcuts {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     font-size: 11px;
     color: var(--bp-text-secondary, #666);
+  }
+
+  .bp-shortcuts span {
+    white-space: nowrap;
   }
 
   kbd {
