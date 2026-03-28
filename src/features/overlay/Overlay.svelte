@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { tick } from 'svelte';
+  import type { HotkeyConfig } from '../../shared/types';
   import {
     isOverlayOpen,
     overlayMode,
@@ -17,6 +18,17 @@
   import { settingsStore } from '../settings/settings.store';
   import SettingsPanel from '../settings/SettingsPanel.svelte';
   import { buildCopyUrl } from '../bookmarks/url-parser';
+
+  function matchesHotkey(event: KeyboardEvent, config: HotkeyConfig): boolean {
+    const pressedKey = event.key === ' ' ? 'Space' : event.key;
+    return (
+      pressedKey === config.key &&
+      event.ctrlKey === config.ctrl &&
+      event.shiftKey === config.shift &&
+      event.altKey === config.alt &&
+      event.metaKey === (config.meta || false)
+    );
+  }
 
   let searchInputRef: HTMLInputElement;
   let listRef: HTMLDivElement;
@@ -100,24 +112,11 @@
       return;
     }
 
-    // Normalize key for comparison (Space key returns ' ')
-    const pressedKey = event.key === ' ' ? 'Space' : event.key;
-
-    // Check if hotkey matches
-    const currentSettings = $settings;
-    const hotkey = currentSettings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false, meta: false };
-
-    if (
-      pressedKey === hotkey.key &&
-      event.ctrlKey === hotkey.ctrl &&
-      event.shiftKey === hotkey.shift &&
-      event.altKey === hotkey.alt &&
-      event.metaKey === (hotkey.meta || false)
-    ) {
+    const hotkey = $settings?.hotkey || { key: 'Space', ctrl: true, shift: false, alt: false, meta: false };
+    if (matchesHotkey(event, hotkey)) {
       event.preventDefault();
       event.stopPropagation();
       overlayActions.toggle();
-      return;
     }
   }
 
@@ -176,75 +175,62 @@
       return;
     }
 
-    // Vim-style navigation (only when not typing)
-    switch (event.key) {
-      case 'j':
-        event.preventDefault();
-        overlayActions.moveDown();
-        scrollToSelected();
-        break;
-
-      case 'k':
-        event.preventDefault();
+    // Fixed navigation keys
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      overlayActions.moveDown();
+      scrollToSelected();
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if ($selectedIndex === 0) {
+        setTimeout(() => searchInputRef?.focus(), 0);
+      } else {
         overlayActions.moveUp();
         scrollToSelected();
-        break;
+      }
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      overlayActions.selectCurrent();
+      return;
+    }
 
-      case 'ArrowDown':
-        event.preventDefault();
-        overlayActions.moveDown();
-        scrollToSelected();
-        break;
+    // Configurable overlay keybinds
+    const kb = $settings?.overlayKeybinds;
+    if (!kb) return;
 
-      case 'ArrowUp':
-        event.preventDefault();
-        if ($selectedIndex === 0) {
-          setTimeout(() => searchInputRef?.focus(), 0);
-        } else {
-          overlayActions.moveUp();
-          scrollToSelected();
-        }
-        break;
-
-      case 'Enter':
-        event.preventDefault();
-        overlayActions.selectCurrent();
-        break;
-
-      case '/':
-        event.preventDefault();
-        setTimeout(() => searchInputRef?.focus(), 0);
-        break;
-
-      case 'a':
-        event.preventDefault();
-        // If there's a selected history item, convert it to a bookmark
-        // Otherwise, bookmark the current page
-        if (currentItem?.type === 'history') {
-          overlayActions.saveHistoryItem(currentItem);
-        } else {
-          overlayActions.saveCurrentPage();
-        }
-        break;
-
-      case 'd':
-        if (!event.ctrlKey) {
-          event.preventDefault();
-          overlayActions.deleteSelected();
-        }
-        break;
-
-      case 'e':
-        event.preventDefault();
-        if (currentItem?.type === 'bookmark') {
-          startEditItem(currentItem);
-        }
-        break;
-
-      case '?':
-        event.preventDefault();
-        showSettings = true;
-        break;
+    if (kb.navDown && matchesHotkey(event, kb.navDown)) {
+      event.preventDefault();
+      overlayActions.moveDown();
+      scrollToSelected();
+    } else if (kb.navUp && matchesHotkey(event, kb.navUp)) {
+      event.preventDefault();
+      overlayActions.moveUp();
+      scrollToSelected();
+    } else if (kb.search && matchesHotkey(event, kb.search)) {
+      event.preventDefault();
+      setTimeout(() => searchInputRef?.focus(), 0);
+    } else if (kb.add && matchesHotkey(event, kb.add)) {
+      event.preventDefault();
+      if (currentItem?.type === 'history') {
+        overlayActions.saveHistoryItem(currentItem);
+      } else {
+        overlayActions.saveCurrentPage();
+      }
+    } else if (kb.delete && matchesHotkey(event, kb.delete)) {
+      event.preventDefault();
+      overlayActions.deleteSelected();
+    } else if (kb.edit && matchesHotkey(event, kb.edit)) {
+      event.preventDefault();
+      if (currentItem?.type === 'bookmark') {
+        startEditItem(currentItem);
+      }
+    } else if (kb.settings && matchesHotkey(event, kb.settings)) {
+      event.preventDefault();
+      showSettings = true;
     }
   }
 
@@ -344,7 +330,7 @@
   }
 
   function getThemeClass(theme: string | undefined): string {
-    return `bp-theme-${theme || 'light'}`;
+    return `bp-theme-${theme || 'dark'}`;
   }
 </script>
 
@@ -449,7 +435,6 @@
                 <div
                   class="bp-item"
                   class:bp-item--selected={flatIndex === $selectedIndex}
-                  class:bp-item--stale={'isStale' in item && item.isStale}
                   class:bp-item--history={item.type === 'history'}
                   on:click={() => {
                     selectedIndex.set(flatIndex);
@@ -482,9 +467,6 @@
                     <span class="bp-item-name">
                       {'alias' in item && item.alias ? item.alias : item.displayName}
                     </span>
-                  {/if}
-                  {#if 'isStale' in item && item.isStale}
-                    <span class="bp-item-badge bp-item-badge--stale" title="Resource may be unavailable">!</span>
                   {/if}
                   <!-- svelte-ignore a11y-click-events-have-key-events -->
                   <button
@@ -784,10 +766,6 @@
     color: white;
   }
 
-  .bp-item--stale {
-    opacity: 0.6;
-  }
-
   .bp-item--history .bp-item-icon {
     color: var(--bp-text-secondary, #666);
   }
@@ -806,19 +784,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--bp-text, #323130);
-  }
-
-  .bp-item-badge {
-    flex-shrink: 0;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: 600;
-  }
-
-  .bp-item-badge--stale {
-    background: var(--bp-warning, #f0ad4e);
-    color: #fff;
   }
 
   .bp-footer {

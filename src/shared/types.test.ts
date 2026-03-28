@@ -10,6 +10,6 @@ describe('DEFAULT_SETTINGS.overlayKeybinds', () => {
     expect(kb.add).toEqual({ key: 'a', ctrl: false, shift: false, alt: false, meta: false });
     expect(kb.delete).toEqual({ key: 'd', ctrl: false, shift: false, alt: false, meta: false });
     expect(kb.edit).toEqual({ key: 'e', ctrl: false, shift: false, alt: false, meta: false });
-    expect(kb.settings).toEqual({ key: '?', ctrl: false, shift: false, alt: false, meta: false });
+    expect(kb.settings).toEqual({ key: '?', ctrl: false, shift: true, alt: false, meta: false });
   });
 });

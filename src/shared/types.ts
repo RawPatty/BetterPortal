@@ -77,7 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
     add:      { key: 'a', ctrl: false, shift: false, alt: false, meta: false },
     delete:   { key: 'd', ctrl: false, shift: false, alt: false, meta: false },
     edit:     { key: 'e', ctrl: false, shift: false, alt: false, meta: false },
-    settings: { key: '?', ctrl: false, shift: false, alt: false, meta: false },
+    settings: { key: '?', ctrl: false, shift: true, alt: false, meta: false },
   },
   lastExportedAt: null,
   bookmarkSyncEnabled: false,
