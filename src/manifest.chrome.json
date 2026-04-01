@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BetterPortal",
   "description": "Bookmark Azure Portal resources for instant revisits. Keyboard-driven overlay with history, cross-tenant navigation, and search.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "icons": {
     "16": "src/icons/icon16.png",
     "48": "src/icons/icon48.png",

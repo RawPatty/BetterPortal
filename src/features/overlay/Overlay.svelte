@@ -326,7 +326,8 @@
     overlayActions.setSearch(target.value);
   }
 
-  function scrollToSelected() {
+  async function scrollToSelected() {
+    await tick();
     const selectedEl = listRef?.querySelector('.bp-item--selected');
     selectedEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
